@@ -1,0 +1,26 @@
+{
+  "name": "hiaok-web",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Web / desktop / mobile console for the hiaok permission center (React and Nuxt front ends, Tauri 2 shell)",
+  "license": "MIT",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "build": "npm run build --workspaces --if-present",
+    "dev:react": "npm run dev -w @hiaok/react",
+    "dev:nuxt": "npm run dev -w @hiaok/nuxt",
+    "tauri": "tauri",
+    "desktop:dev": "tauri dev",
+    "desktop:build": "tauri build",
+    "android:dev": "tauri android dev",
+    "ios:dev": "tauri ios dev"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.0.0"
+  }
+}

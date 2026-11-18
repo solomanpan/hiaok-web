@@ -1,0 +1,23 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "hiaok",
+  "version": "1.0.0",
+  "identifier": "com.solomanpan.hiaok",
+  "build": {
+    "frontendDist": "../apps/react/dist",
+    "devUrl": "http://localhost:5173",
+    "beforeDevCommand": "npm run dev:react",
+    "beforeBuildCommand": "npm run build -w @hiaok/react"
+  },
+  "app": {
+    "windows": [{ "title": "hiaok", "width": 1180, "height": 780, "minWidth": 360, "minHeight": 520 }],
+    "security": {
+      "csp": "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; connect-src *"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.icns", "icons/icon.ico"]
+  }
+}
