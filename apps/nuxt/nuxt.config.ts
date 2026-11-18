@@ -1,5 +1,8 @@
 // SPA build (`ssr: false`) so `nuxt generate` yields plain static files that the Tauri webview (desktop / Android / iOS) can load.
+import tailwindcss from '@tailwindcss/vite';
+
 export default defineNuxtConfig({
+  vite: { plugins: [tailwindcss()] },
   ssr: false,
   compatibilityDate: '2025-01-01',
   devtools: { enabled: false },

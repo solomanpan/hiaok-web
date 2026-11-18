@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ChevronLeft, ChevronRight, ListTree, Plus, RefreshCw, Search, Table2 } from 'lucide-vue-next';
 import {
   changes, createRow, deleteRow, formatCell, initialValues, listRows, loadTree, resourceByName, runAction,
   updateRow, type ActionDef, type Row, type RowPage, type TreeNode, type Values,
@@ -82,51 +83,70 @@ const rowName = (row: Row) => String(row[res.value.nameField] ?? row[res.value.i
 </script>
 
 <template>
-  <div>
-    <div class="bar">
-      <h2>{{ l(res.name) }}</h2>
-      <button v-if="res.create" class="primary" @click="dialog = { kind: 'create' }">{{ t('add') }}</button>
-      <button @click="load">{{ t('refresh') }}</button>
-      <button v-if="res.tree" @click="asTree = !asTree">{{ asTree ? t('listView') : t('treeView') }}</button>
-      <span class="grow" />
+  <div class="space-y-4">
+    <div class="flex flex-wrap items-center gap-2">
+      <h2 class="mr-2 text-2xl font-semibold tracking-tight">{{ l(res.name) }}</h2>
+      <UiButton v-if="res.create" @click="dialog = { kind: 'create' }"><Plus />{{ t('add') }}</UiButton>
+      <UiButton variant="outline" @click="load"><RefreshCw />{{ t('refresh') }}</UiButton>
+      <UiButton v-if="res.tree" variant="outline" @click="asTree = !asTree">
+        <Table2 v-if="asTree" /><ListTree v-else />{{ asTree ? t('listView') : t('treeView') }}
+      </UiButton>
+      <span class="flex-1" />
       <template v-if="!asTree && res.filters">
-        <input v-for="f in res.filters" :key="f.name" v-model="filters[f.name]" style="width: 160px" :placeholder="l(f.name)" @keydown.enter="search" />
-        <button @click="search">{{ t('search') }}</button>
+        <UiInput v-for="f in res.filters" :key="f.name" class="w-40" :placeholder="l(f.name)" :model-value="String(filters[f.name] ?? '')"
+          @update:model-value="(v) => { filters[f.name] = v; }" @keydown.enter="search" />
+        <UiButton variant="outline" @click="search"><Search />{{ t('search') }}</UiButton>
       </template>
     </div>
 
-    <div v-if="needsOrg" class="msg">{{ t('needOrg') }}</div>
-    <div v-if="error" class="msg bad">{{ error }}</div>
-    <div v-if="notice" class="msg ok">{{ notice }}</div>
-    <div v-if="loading" class="msg">{{ t('loading') }}</div>
+    <UiAlert v-if="needsOrg">{{ t('needOrg') }}</UiAlert>
+    <UiAlert v-if="error" variant="destructive">{{ error }}</UiAlert>
+    <UiAlert v-if="notice" variant="success">{{ notice }}</UiAlert>
+    <UiAlert v-if="loading">{{ t('loading') }}</UiAlert>
 
     <template v-if="asTree && tree">
-      <div v-if="tree.length === 0" class="msg">{{ t('empty') }}</div>
-      <div v-else class="card tree" style="max-width: none"><TreeList :nodes="tree" :res="res" @pick="pick" /></div>
+      <UiAlert v-if="tree.length === 0">{{ t('empty') }}</UiAlert>
+      <UiCard v-else class="p-3"><TreeList :nodes="tree" :res="res" @pick="pick" /></UiCard>
     </template>
 
     <template v-if="!asTree && page">
-      <div class="tablewrap">
-        <table>
-          <thead><tr><th v-for="c in res.columns" :key="c">{{ l(c) }}</th><th>{{ t('actions') }}</th></tr></thead>
-          <tbody>
-            <tr v-if="rows.length === 0"><td :colspan="res.columns.length + 1">{{ t('empty') }}</td></tr>
-            <tr v-for="row in rows" :key="String(row[res.idField])">
-              <td v-for="c in res.columns" :key="c" :title="String(row[c] ?? '')">{{ formatCell(session.locale, c, row[c]) }}</td>
-              <td class="acts">
-                <button @click="dialog = { kind: 'detail', row }">{{ t('details') }}</button>
-                <button v-if="res.update" @click="dialog = { kind: 'edit', row }">{{ t('edit') }}</button>
-                <button v-for="a in res.actions" :key="a.key" @click="dialog = { kind: 'action', row, action: a }">{{ l(a.key) }}</button>
-                <button v-if="res.remove" class="danger" @click="dialog = { kind: 'delete', row }">{{ t('delete') }}</button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      <div class="pager">
-        <span>{{ t('total') }}: {{ total }}</span>
-        <button :disabled="offset === 0" @click="offset = Math.max(0, offset - PAGE)">{{ t('prev') }}</button>
-        <button :disabled="offset + PAGE >= total" @click="offset += PAGE">{{ t('next') }}</button>
+      <UiCard class="overflow-hidden">
+        <div class="relative w-full overflow-auto">
+          <table class="w-full caption-bottom text-sm">
+            <thead class="[&_tr]:border-b">
+              <tr class="border-b">
+                <th v-for="c in res.columns" :key="c" class="h-11 whitespace-nowrap px-3 text-left align-middle text-xs font-medium text-muted-foreground">{{ l(c) }}</th>
+                <th class="h-11 px-3 text-left align-middle text-xs font-medium text-muted-foreground">{{ t('actions') }}</th>
+              </tr>
+            </thead>
+            <tbody class="[&_tr:last-child]:border-0">
+              <tr v-if="rows.length === 0" class="border-b">
+                <td :colspan="res.columns.length + 1" class="py-8 text-center text-muted-foreground">{{ t('empty') }}</td>
+              </tr>
+              <tr v-for="row in rows" :key="String(row[res.idField])" class="border-b transition-colors hover:bg-muted/50">
+                <td v-for="c in res.columns" :key="c" :title="String(row[c] ?? '')" class="max-w-64 truncate whitespace-nowrap px-3 py-2.5 align-middle">
+                  <UiBadge v-if="c === 'state' && row[c] !== undefined && row[c] !== null" :variant="Number(row[c]) === 0 ? 'success' : 'destructive'">
+                    {{ formatCell(session.locale, c, row[c]) }}
+                  </UiBadge>
+                  <template v-else>{{ formatCell(session.locale, c, row[c]) }}</template>
+                </td>
+                <td class="px-3 py-2.5">
+                  <div class="flex gap-1.5">
+                    <UiButton size="sm" variant="outline" @click="dialog = { kind: 'detail', row }">{{ t('details') }}</UiButton>
+                    <UiButton v-if="res.update" size="sm" variant="outline" @click="dialog = { kind: 'edit', row }">{{ t('edit') }}</UiButton>
+                    <UiButton v-for="a in res.actions" :key="a.key" size="sm" variant="secondary" @click="dialog = { kind: 'action', row, action: a }">{{ l(a.key) }}</UiButton>
+                    <UiButton v-if="res.remove" size="sm" variant="ghost" class="text-destructive hover:text-destructive" @click="dialog = { kind: 'delete', row }">{{ t('delete') }}</UiButton>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </UiCard>
+      <div class="flex items-center justify-end gap-2 text-sm text-muted-foreground">
+        <span class="mr-2">{{ t('total') }}: {{ total }}</span>
+        <UiButton size="sm" variant="outline" :disabled="offset === 0" @click="offset = Math.max(0, offset - PAGE)"><ChevronLeft />{{ t('prev') }}</UiButton>
+        <UiButton size="sm" variant="outline" :disabled="offset + PAGE >= total" @click="offset += PAGE">{{ t('next') }}<ChevronRight /></UiButton>
       </div>
     </template>
 
@@ -138,22 +158,16 @@ const rowName = (row: Row) => String(row[res.value.nameField] ?? row[res.value.i
       :fields="dialog.action.fields" :initial="initialValues(dialog.action.fields, session, dialog.row, dialog.action.prefill)"
       :submit-label="t('confirm')" :on-submit="submitAction" @close="closeAction" />
 
-    <div v-if="dialog?.kind === 'delete'" class="modal" @mousedown.self="dialog = null">
-      <div class="card">
-        <h1>{{ t('confirmDelete') }}</h1>
-        <p>{{ rowName(dialog.row) }}</p>
-        <div class="row" style="justify-content: flex-end">
-          <button @click="dialog = null">{{ t('cancel') }}</button>
-          <button class="danger" @click="confirmDelete">{{ t('delete') }}</button>
-        </div>
+    <UiDialog v-if="dialog?.kind === 'delete'" :title="t('confirmDelete')" @close="dialog = null">
+      <p class="break-all text-sm">{{ rowName(dialog.row) }}</p>
+      <div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+        <UiButton variant="outline" @click="dialog = null">{{ t('cancel') }}</UiButton>
+        <UiButton variant="destructive" @click="confirmDelete">{{ t('delete') }}</UiButton>
       </div>
-    </div>
-    <div v-if="dialog?.kind === 'detail' || dialog?.kind === 'result'" class="modal" @mousedown.self="dialog = null">
-      <div class="card">
-        <h1>{{ dialog.kind === 'detail' ? rowName(dialog.row) : dialog.title }}</h1>
-        <pre>{{ JSON.stringify(dialog.kind === 'detail' ? dialog.row : dialog.data, null, 2) }}</pre>
-        <div class="row" style="justify-content: flex-end"><button @click="dialog = null">{{ t('close') }}</button></div>
-      </div>
-    </div>
+    </UiDialog>
+    <UiDialog v-if="dialog?.kind === 'detail' || dialog?.kind === 'result'" :title="dialog.kind === 'detail' ? rowName(dialog.row) : dialog.title" @close="dialog = null">
+      <pre class="max-h-[50vh] overflow-auto rounded-md bg-muted p-3 text-xs">{{ JSON.stringify(dialog.kind === 'detail' ? dialog.row : dialog.data, null, 2) }}</pre>
+      <div class="flex justify-end"><UiButton variant="outline" @click="dialog = null">{{ t('close') }}</UiButton></div>
+    </UiDialog>
   </div>
 </template>

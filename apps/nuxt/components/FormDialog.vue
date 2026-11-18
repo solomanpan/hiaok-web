@@ -18,6 +18,12 @@ onMounted(() => {
   }
 });
 
+const picked = (name: string) => new Set(Array.isArray(values[name]) ? (values[name] as string[]) : []);
+function toggle(name: string, v: string, on: boolean) {
+  const next = picked(name);
+  if (on) next.add(v); else next.delete(v);
+  values[name] = [...next];
+}
 const optLabel = (f: FieldDef, o: Option) => (f.options ? l(o.label) : o.label);
 
 async function submit() {
@@ -31,28 +37,34 @@ async function submit() {
 </script>
 
 <template>
-  <div class="modal" @mousedown.self="!busy && emit('close')">
-    <form class="card" @submit.prevent="submit">
-      <h1>{{ title }}</h1>
-      <label v-for="f in fields" :key="f.name" class="field">
-        <span>{{ l(f.name) }}{{ f.required ? ' *' : '' }}</span>
-        <input v-if="f.type === 'bool'" v-model="values[f.name]" type="checkbox" style="width: auto" />
-        <select v-else-if="f.type === 'select'" v-model="values[f.name]" :required="f.required">
+  <UiDialog :title="title" @close="!busy && emit('close')">
+    <form class="grid gap-4" @submit.prevent="submit">
+      <div v-for="f in fields" :key="f.name" class="grid gap-1.5">
+        <UiLabel>{{ l(f.name) }}{{ f.required ? ' *' : '' }}</UiLabel>
+        <UiCheckbox v-if="f.type === 'bool'" :model-value="Boolean(values[f.name])" :aria-label="l(f.name)"
+          @update:model-value="(v) => { values[f.name] = v === true; }" />
+        <UiSelect v-else-if="f.type === 'select'" :model-value="String(values[f.name] ?? '')"
+          @update:model-value="(v) => { values[f.name] = v; }">
           <option value="">{{ t('pick') }}</option>
           <option v-for="o in options[f.name] ?? []" :key="o.value" :value="String(o.value)">{{ optLabel(f, o) }}</option>
-        </select>
-        <select v-else-if="f.type === 'multi'" v-model="values[f.name]" multiple :size="Math.min(6, Math.max(3, (options[f.name] ?? []).length))">
-          <option v-for="o in options[f.name] ?? []" :key="o.value" :value="String(o.value)">{{ optLabel(f, o) }}</option>
-        </select>
-        <input v-else v-model="values[f.name]" :required="f.required" autocomplete="off"
-          :type="f.type === 'password' ? 'password' : f.type === 'number' ? 'number' : f.type === 'date' ? 'date' : f.type === 'datetime' ? 'datetime-local' : 'text'" />
-      </label>
-      <div v-if="error" class="msg bad">{{ error }}</div>
-      <div v-if="busy" class="msg">{{ t('working') }}</div>
-      <div class="row" style="justify-content: flex-end">
-        <button type="button" :disabled="busy" @click="emit('close')">{{ t('cancel') }}</button>
-        <button class="primary" :disabled="busy">{{ submitLabel ?? t('save') }}</button>
+        </UiSelect>
+        <div v-else-if="f.type === 'multi'" class="max-h-44 space-y-1 overflow-auto rounded-md border bg-card p-2">
+          <div v-if="(options[f.name] ?? []).length === 0" class="px-1 text-sm text-muted-foreground">{{ t('empty') }}</div>
+          <label v-for="o in options[f.name] ?? []" :key="o.value" class="flex cursor-pointer items-center gap-2 rounded px-1 py-1 text-sm hover:bg-accent">
+            <UiCheckbox :model-value="picked(f.name).has(String(o.value))" @update:model-value="(v) => toggle(f.name, String(o.value), v === true)" />
+            {{ optLabel(f, o) }}
+          </label>
+        </div>
+        <UiInput v-else :model-value="String(values[f.name] ?? '')" :required="f.required" autocomplete="off"
+          :type="f.type === 'password' ? 'password' : f.type === 'number' ? 'number' : f.type === 'date' ? 'date' : f.type === 'datetime' ? 'datetime-local' : 'text'"
+          @update:model-value="(v) => { values[f.name] = v; }" />
+      </div>
+      <UiAlert v-if="error" variant="destructive">{{ error }}</UiAlert>
+      <UiAlert v-if="busy">{{ t('working') }}</UiAlert>
+      <div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+        <UiButton variant="outline" :disabled="busy" @click="emit('close')">{{ t('cancel') }}</UiButton>
+        <UiButton type="submit" :disabled="busy">{{ submitLabel ?? t('save') }}</UiButton>
       </div>
     </form>
-  </div>
+  </UiDialog>
 </template>

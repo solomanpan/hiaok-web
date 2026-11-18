@@ -4,20 +4,23 @@ const { session, update, t } = useApp();
 </script>
 
 <template>
-  <div class="row">
-    <label class="field"><span>{{ t('serverUrl') }}</span>
-      <input :value="session.baseUrl" placeholder="http://localhost:8000" inputmode="url"
-        @input="update({ baseUrl: ($event.target as HTMLInputElement).value.trim() })" />
-    </label>
-    <label class="field" style="max-width: 110px"><span>{{ t('backend') }}</span>
-      <select :value="session.backend" @change="update({ backend: ($event.target as HTMLSelectElement).value as Backend })">
+  <div class="grid grid-cols-2 gap-3 sm:grid-cols-[1fr_6.5rem_6.5rem]">
+    <div class="col-span-2 grid gap-1.5 sm:col-span-1">
+      <UiLabel>{{ t('serverUrl') }}</UiLabel>
+      <UiInput :model-value="session.baseUrl" placeholder="http://localhost:8000" inputmode="url"
+        @update:model-value="(v) => update({ baseUrl: String(v).trim() })" />
+    </div>
+    <div class="grid gap-1.5">
+      <UiLabel>{{ t('backend') }}</UiLabel>
+      <UiSelect :model-value="session.backend" @update:model-value="(v) => update({ backend: v as Backend })">
         <option v-for="b in BACKENDS" :key="b">{{ b }}</option>
-      </select>
-    </label>
-    <label class="field" style="max-width: 110px"><span>{{ t('language') }}</span>
-      <select :value="session.locale" @change="update({ locale: ($event.target as HTMLSelectElement).value as Locale })">
+      </UiSelect>
+    </div>
+    <div class="grid gap-1.5">
+      <UiLabel>{{ t('language') }}</UiLabel>
+      <UiSelect :model-value="session.locale" @update:model-value="(v) => update({ locale: v as Locale })">
         <option v-for="x in LOCALES" :key="x.code" :value="x.code">{{ x.label }}</option>
-      </select>
-    </label>
+      </UiSelect>
+    </div>
   </div>
 </template>

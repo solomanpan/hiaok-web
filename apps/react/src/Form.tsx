@@ -1,47 +1,61 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { loadOptions, missingRequired, type FieldDef, type Option, type Values } from '@hiaok/shared';
+import { Alert } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select } from '@/components/ui/select';
 import { errorText, useApp } from './state';
 
-export function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+/** Plain dialog (details, confirmations, results). */
+export function Modal({ title, onClose, children, footer }: { title: string; onClose: () => void; children: ReactNode; footer?: ReactNode }) {
   const { t } = useApp();
   return (
-    <div className="modal" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="card" role="dialog" aria-label={title}>
-        <h1>{title}</h1>
+    <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent>
+        <DialogHeader><DialogTitle>{title}</DialogTitle></DialogHeader>
         {children}
-        <div className="row" style={{ justifyContent: 'flex-end', marginTop: 8 }}>
-          <button type="button" onClick={onClose}>{t('close')}</button>
-        </div>
-      </div>
-    </div>
+        <DialogFooter>{footer}<Button variant="outline" onClick={onClose}>{t('close')}</Button></DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
 function FieldInput({ f, value, onChange, options }: { f: FieldDef; value: unknown; onChange: (v: unknown) => void; options: Option[] }) {
   const { t, l } = useApp();
   const type = f.type ?? 'text';
-  const opt = (o: Option) => <option key={o.value} value={String(o.value)}>{enumLabel(o)}</option>;
-  const enumLabel = (o: Option) => (f.options ? l(o.label) : o.label);
-  if (type === 'bool')
-    return <input type="checkbox" style={{ width: 'auto' }} checked={Boolean(value)} onChange={(e) => onChange(e.target.checked)} />;
+  const optLabel = (o: Option) => (f.options ? l(o.label) : o.label);
+  if (type === 'bool') return <Checkbox checked={Boolean(value)} onCheckedChange={(c) => onChange(c === true)} aria-label={l(f.name)} />;
   if (type === 'select')
     return (
-      <select value={String(value ?? '')} onChange={(e) => onChange(e.target.value)} required={f.required}>
+      <Select value={String(value ?? '')} onChange={(e) => onChange(e.target.value)} required={f.required}>
         <option value="">{t('pick')}</option>
-        {options.map(opt)}
-      </select>
+        {options.map((o) => <option key={o.value} value={String(o.value)}>{optLabel(o)}</option>)}
+      </Select>
     );
   if (type === 'multi') {
-    const picked = Array.isArray(value) ? (value as string[]) : [];
+    const picked = new Set(Array.isArray(value) ? (value as string[]) : []);
+    const toggle = (v: string, on: boolean) => {
+      const next = new Set(picked);
+      if (on) next.add(v); else next.delete(v);
+      onChange([...next]);
+    };
     return (
-      <select multiple size={Math.min(6, Math.max(3, options.length))} value={picked}
-        onChange={(e) => onChange(Array.from(e.target.selectedOptions, (o) => o.value))}>
-        {options.map(opt)}
-      </select>
+      <div className="max-h-44 space-y-1 overflow-auto rounded-md border bg-card p-2">
+        {options.length === 0 && <div className="px-1 text-sm text-muted-foreground">{t('empty')}</div>}
+        {options.map((o) => (
+          <label key={o.value} className="flex cursor-pointer items-center gap-2 rounded px-1 py-1 text-sm hover:bg-accent">
+            <Checkbox checked={picked.has(String(o.value))} onCheckedChange={(c) => toggle(String(o.value), c === true)} />
+            {optLabel(o)}
+          </label>
+        ))}
+      </div>
     );
   }
   const html = type === 'password' ? 'password' : type === 'number' ? 'number' : type === 'date' ? 'date' : type === 'datetime' ? 'datetime-local' : 'text';
-  return <input type={html} value={String(value ?? '')} onChange={(e) => onChange(e.target.value)} required={f.required}
+  return <Input type={html} value={String(value ?? '')} onChange={(e) => onChange(e.target.value)} required={f.required}
     autoComplete={type === 'password' ? 'new-password' : 'off'} />;
 }
 
@@ -75,23 +89,25 @@ export function FormDialog({ title, fields, initial, onSubmit, onClose, submitLa
   };
 
   return (
-    <div className="modal" onMouseDown={(e) => { if (e.target === e.currentTarget && !busy) onClose(); }}>
-      <form className="card" onSubmit={submit}>
-        <h1>{title}</h1>
-        {fields.map((f) => (
-          <label className="field" key={f.name}>
-            <span>{l(f.name)}{f.required ? ' *' : ''}</span>
-            <FieldInput f={f} value={values[f.name]} options={options[f.name] ?? []}
-              onChange={(v) => setValues((p) => ({ ...p, [f.name]: v }))} />
-          </label>
-        ))}
-        {error && <div className="msg bad">{error}</div>}
-        {busy && <div className="msg">{t('working')}</div>}
-        <div className="row" style={{ justifyContent: 'flex-end' }}>
-          <button type="button" onClick={onClose} disabled={busy}>{t('cancel')}</button>
-          <button className="primary" disabled={busy}>{submitLabel ?? t('save')}</button>
-        </div>
-      </form>
-    </div>
+    <Dialog open onOpenChange={(o) => { if (!o && !busy) onClose(); }}>
+      <DialogContent>
+        <DialogHeader><DialogTitle>{title}</DialogTitle></DialogHeader>
+        <form onSubmit={submit} className="grid gap-4">
+          {fields.map((f) => (
+            <div className="grid gap-1.5" key={f.name}>
+              <Label>{l(f.name)}{f.required ? ' *' : ''}</Label>
+              <FieldInput f={f} value={values[f.name]} options={options[f.name] ?? []}
+                onChange={(v) => setValues((p) => ({ ...p, [f.name]: v }))} />
+            </div>
+          ))}
+          {error && <Alert variant="destructive">{error}</Alert>}
+          {busy && <Alert>{t('working')}</Alert>}
+          <DialogFooter>
+            <Button variant="outline" onClick={onClose} disabled={busy}>{t('cancel')}</Button>
+            <Button type="submit" disabled={busy}>{submitLabel ?? t('save')}</Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }

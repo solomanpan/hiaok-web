@@ -24,22 +24,19 @@ async function submit() {
 </script>
 
 <template>
-  <div class="auth">
-    <form class="card" @submit.prevent="submit">
-      <h1>{{ t('appName') }} · {{ t('register') }}</h1>
-      <AuthSettings />
-      <PickOrType v-model="org" :title="t('orgUuid')" :options="orgs" />
-      <PickOrType v-model="f.tenant" :title="t('tenantUuid')" :options="tenants" />
-      <label class="field"><span>{{ t('username') }}</span><input v-model="f.username" autocomplete="username" required /></label>
-      <label class="field"><span>{{ t('password') }}</span><input v-model="f.password" type="password" autocomplete="new-password" required minlength="8" /></label>
-      <label class="field"><span>{{ t('email') }}</span><input v-model="f.email" type="email" /></label>
-      <label class="field"><span>{{ t('phone') }}</span><input v-model="f.phone" inputmode="tel" /></label>
-      <label class="field"><span>{{ t('nickname') }}</span><input v-model="f.nickname" /></label>
-      <CaptchaField v-model="code" :captcha="captcha" @refresh="refreshCaptcha" />
-      <div v-if="error" class="msg bad">{{ error }}</div>
-      <div v-if="done" class="msg ok">{{ t('registered') }}</div>
-      <button class="primary" :disabled="busy" style="width: 100%">{{ busy ? t('working') : t('register') }}</button>
-      <button type="button" class="link" @click="navigateTo('/login')">{{ t('haveAccount') }}</button>
-    </form>
-  </div>
+  <AuthPage :title="`${t('appName')} · ${t('register')}`" @submit="submit">
+    <AuthSettings />
+    <PickOrType v-model="org" :title="t('orgUuid')" :options="orgs" />
+    <PickOrType v-model="f.tenant" :title="t('tenantUuid')" :options="tenants" />
+    <div class="grid gap-1.5"><UiLabel>{{ t('username') }}</UiLabel><UiInput v-model="f.username" autocomplete="username" required /></div>
+    <div class="grid gap-1.5"><UiLabel>{{ t('password') }}</UiLabel><UiInput v-model="f.password" type="password" autocomplete="new-password" required minlength="8" /></div>
+    <div class="grid gap-1.5"><UiLabel>{{ t('email') }}</UiLabel><UiInput v-model="f.email" type="email" /></div>
+    <div class="grid gap-1.5"><UiLabel>{{ t('phone') }}</UiLabel><UiInput v-model="f.phone" inputmode="tel" /></div>
+    <div class="grid gap-1.5"><UiLabel>{{ t('nickname') }}</UiLabel><UiInput v-model="f.nickname" /></div>
+    <CaptchaField v-model="code" :captcha="captcha" @refresh="refreshCaptcha" />
+    <UiAlert v-if="error" variant="destructive">{{ error }}</UiAlert>
+    <UiAlert v-if="done" variant="success">{{ t('registered') }}</UiAlert>
+    <UiButton type="submit" :disabled="busy" class="w-full">{{ busy ? t('working') : t('register') }}</UiButton>
+    <UiButton variant="link" class="h-auto p-0" @click="navigateTo('/login')">{{ t('haveAccount') }}</UiButton>
+  </AuthPage>
 </template>

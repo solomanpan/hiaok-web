@@ -6,14 +6,18 @@ const { session, t } = useApp();
 </script>
 
 <template>
-  <ul>
+  <ul class="space-y-0.5 pl-5 first:pl-0">
     <li v-for="n in nodes" :key="String(n.item[res.idField])">
-      <div>
+      <div class="flex flex-wrap items-center gap-2 rounded-md px-2 py-1 hover:bg-accent">
         <b>{{ String(n.item[res.nameField] ?? '') }}</b>
-        <small>{{ formatCell(session.locale, 'state', n.item.state) }}</small>
-        <button @click="emit('pick', n.item, 'detail')">{{ t('details') }}</button>
-        <button v-if="res.update" @click="emit('pick', n.item, 'edit')">{{ t('edit') }}</button>
-        <button v-if="res.remove" class="danger" @click="emit('pick', n.item, 'delete')">{{ t('delete') }}</button>
+        <UiBadge v-if="n.item.state !== undefined && n.item.state !== null" :variant="Number(n.item.state) === 0 ? 'success' : 'destructive'">
+          {{ formatCell(session.locale, 'state', n.item.state) }}
+        </UiBadge>
+        <span class="ml-auto flex gap-1.5">
+          <UiButton size="sm" variant="outline" @click="emit('pick', n.item, 'detail')">{{ t('details') }}</UiButton>
+          <UiButton v-if="res.update" size="sm" variant="outline" @click="emit('pick', n.item, 'edit')">{{ t('edit') }}</UiButton>
+          <UiButton v-if="res.remove" size="sm" variant="ghost" class="text-destructive hover:text-destructive" @click="emit('pick', n.item, 'delete')">{{ t('delete') }}</UiButton>
+        </span>
       </div>
       <TreeList v-if="n.children.length" :nodes="n.children" :res="res" @pick="(r, k) => emit('pick', r, k)" />
     </li>

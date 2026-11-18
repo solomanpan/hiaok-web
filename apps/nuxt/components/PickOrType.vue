@@ -9,18 +9,18 @@ const val = computed({ get: () => props.modelValue, set: (v: string) => emit('up
 </script>
 
 <template>
-  <label class="field">
-    <span>{{ title }}</span>
-    <div v-if="manual" class="row">
-      <input v-model="val" placeholder="UUID" required />
-      <button v-if="options.length" type="button" @click="manual = false">{{ t('pick') }}</button>
+  <div class="grid gap-1.5">
+    <UiLabel>{{ title }}</UiLabel>
+    <div v-if="manual" class="flex gap-2">
+      <UiInput v-model="val" placeholder="UUID" required />
+      <UiButton v-if="options.length" variant="outline" @click="manual = false">{{ t('pick') }}</UiButton>
     </div>
-    <div v-else class="row">
-      <select v-model="val" required>
+    <div v-else class="flex gap-2">
+      <UiSelect v-model="val" required>
         <option value="">{{ t('pick') }}</option>
         <option v-for="o in options" :key="o.value" :value="String(o.value)">{{ o.label }}</option>
-      </select>
-      <button type="button" @click="manual = true">{{ t('manual') }}</button>
+      </UiSelect>
+      <UiButton variant="outline" @click="manual = true">{{ t('manual') }}</UiButton>
     </div>
-  </label>
+  </div>
 </template>

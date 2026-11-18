@@ -11,10 +11,12 @@ It talks to the hiaok back end (`POST /v1/api/hiaok/<resource>/<action>` with `{
 ```
 packages/api-client   typed client: envelope, ApiError, submit + poll for the asynchronous writes
 packages/shared       resource registry (RESOURCES), request builders, labels (en / zh / ja), session storage
-apps/react            Vite + React 19
-apps/nuxt             Nuxt 3, SPA (`ssr: false`) — same pages, same registry
+apps/react            Vite + React 19 + Tailwind + shadcn/ui
+apps/nuxt             Nuxt 3, SPA (`ssr: false`) + Tailwind + shadcn-vue — same pages, same registry
 src-tauri             Tauri 2 shell (desktop + mobile) around the React build
 ```
+
+**UI**: Tailwind CSS v4 with shadcn/ui — `apps/react/src/components/ui` (Radix primitives) and, for Nuxt, the shadcn-vue counterpart `apps/nuxt/components/ui` (Reka UI). Both use the same theme tokens (`styles.css`: light/dark follows the OS, `--primary` etc.), so restyling is one file. The components are source files in the repo, as in shadcn: edit them freely. Selects are the styled native `<select>` (shadcn "native select"), which behaves best inside iOS / Android web views.
 
 Both apps render every list, form and action **from `RESOURCES`** — a new endpoint is a few lines in `packages/shared/src/resources.ts`, not a new page.
 

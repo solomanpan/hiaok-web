@@ -1,7 +1,25 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import type { Captcha } from '@hiaok/api-client';
 import { BACKENDS, LOCALES, listOrganizations, listTenants, type Backend, type Locale, type Option } from '@hiaok/shared';
+import { Alert } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select } from '@/components/ui/select';
 import { errorText, useApp } from './state';
+
+const Field = ({ label, children }: { label: string; children: React.ReactNode }) => (
+  <div className="grid gap-1.5"><Label>{label}</Label>{children}</div>
+);
+const Page = ({ title, onSubmit, children }: { title: string; onSubmit: (e: FormEvent) => void; children: React.ReactNode }) => (
+  <div className="grid min-h-dvh place-items-center p-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))]">
+    <Card className="w-full max-w-md">
+      <CardHeader><CardTitle>{title}</CardTitle></CardHeader>
+      <CardContent><form className="grid gap-4" onSubmit={onSubmit}>{children}</form></CardContent>
+    </Card>
+  </div>
+);
 
 /** A select that falls back to a free UUID input when the list is empty or not available. */
 function PickOrType({ title, options, value, onChange }: { title: string; options: Option[]; value: string; onChange: (v: string) => void }) {
@@ -9,23 +27,22 @@ function PickOrType({ title, options, value, onChange }: { title: string; option
   const [manual, setManual] = useState(options.length === 0);
   useEffect(() => { setManual(options.length === 0); }, [options.length]);
   return (
-    <label className="field">
-      <span>{title}</span>
+    <Field label={title}>
       {manual ? (
-        <div className="row">
-          <input value={value} onChange={(e) => onChange(e.target.value)} placeholder="UUID" required />
-          {options.length > 0 && <button type="button" onClick={() => setManual(false)}>{t('pick')}</button>}
+        <div className="flex gap-2">
+          <Input value={value} onChange={(e) => onChange(e.target.value)} placeholder="UUID" required />
+          {options.length > 0 && <Button variant="outline" onClick={() => setManual(false)}>{t('pick')}</Button>}
         </div>
       ) : (
-        <div className="row">
-          <select value={value} onChange={(e) => onChange(e.target.value)} required>
+        <div className="flex gap-2">
+          <Select value={value} onChange={(e) => onChange(e.target.value)} required>
             <option value="">{t('pick')}</option>
             {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-          </select>
-          <button type="button" onClick={() => setManual(true)}>{t('manual')}</button>
+          </Select>
+          <Button variant="outline" onClick={() => setManual(true)}>{t('manual')}</Button>
         </div>
       )}
-    </label>
+    </Field>
   );
 }
 
@@ -42,36 +59,36 @@ function CaptchaField({ captcha, code, setCode, refresh }: { captcha: Captcha | 
   const { t } = useApp();
   if (!captcha?.required) return null;
   return (
-    <label className="field captcha">
-      <span>{t('captcha')}</span>
-      <div className="row">
-        <input value={code} onChange={(e) => setCode(e.target.value)} autoComplete="off" autoCapitalize="characters" required />
-        {captcha.image && <img src={captcha.image} alt={t('captcha')} title={t('refreshCaptcha')} onClick={refresh} />}
+    <Field label={t('captcha')}>
+      <div className="flex items-center gap-2">
+        <Input value={code} onChange={(e) => setCode(e.target.value)} autoComplete="off" autoCapitalize="characters" required />
+        {captcha.image && (
+          <img src={captcha.image} alt={t('captcha')} title={t('refreshCaptcha')} onClick={refresh}
+            className="h-10 shrink-0 cursor-pointer rounded-md border bg-white" />
+        )}
       </div>
-    </label>
+    </Field>
   );
 }
 
 function Settings() {
   const { session, update, t } = useApp();
   return (
-    <>
-      <div className="row">
-        <label className="field"><span>{t('serverUrl')}</span>
-          <input value={session.baseUrl} onChange={(e) => update({ baseUrl: e.target.value.trim() })} placeholder="http://localhost:8000" inputMode="url" />
-        </label>
-        <label className="field" style={{ maxWidth: 110 }}><span>{t('backend')}</span>
-          <select value={session.backend} onChange={(e) => update({ backend: e.target.value as Backend })}>
-            {BACKENDS.map((b) => <option key={b}>{b}</option>)}
-          </select>
-        </label>
-        <label className="field" style={{ maxWidth: 110 }}><span>{t('language')}</span>
-          <select value={session.locale} onChange={(e) => update({ locale: e.target.value as Locale })}>
-            {LOCALES.map((l) => <option key={l.code} value={l.code}>{l.label}</option>)}
-          </select>
-        </label>
-      </div>
-    </>
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-[1fr_6.5rem_6.5rem]">
+      <div className="col-span-2 sm:col-span-1"><Field label={t('serverUrl')}>
+        <Input value={session.baseUrl} onChange={(e) => update({ baseUrl: e.target.value.trim() })} placeholder="http://localhost:8000" inputMode="url" />
+      </Field></div>
+      <Field label={t('backend')}>
+        <Select value={session.backend} onChange={(e) => update({ backend: e.target.value as Backend })}>
+          {BACKENDS.map((b) => <option key={b}>{b}</option>)}
+        </Select>
+      </Field>
+      <Field label={t('language')}>
+        <Select value={session.locale} onChange={(e) => update({ locale: e.target.value as Locale })}>
+          {LOCALES.map((l) => <option key={l.code} value={l.code}>{l.label}</option>)}
+        </Select>
+      </Field>
+    </div>
   );
 }
 
@@ -137,25 +154,20 @@ export function Login() {
   };
 
   return (
-    <div className="auth">
-      <form className="card" onSubmit={submit}>
-        <h1>{t('appName')} · {t('signIn')}</h1>
-        <Settings />
-        <PickOrType title={t('orgUuid')} options={orgs} value={org} onChange={(v) => { setOrg(v); setTenant(''); }} />
-        <PickOrType title={t('tenantUuid')} options={tenants} value={tenant} onChange={setTenant} />
-        <label className="field"><span>{t('username')}</span>
-          <input value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" required /></label>
-        <label className="field"><span>{t('password')}</span>
-          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" required /></label>
-        <CaptchaField captcha={captcha} code={code} setCode={setCode} refresh={refresh} />
-        {error && <div className="msg bad">{error}</div>}
-        <button className="primary" disabled={busy} style={{ width: '100%' }}>{busy ? t('working') : t('signIn')}</button>
-        <div className="row" style={{ marginTop: 10 }}>
-          <button type="button" className="link" onClick={() => { location.hash = '#/register'; }}>{t('noAccount')}</button>
-          <button type="button" className="link" onClick={enterWithoutAuth}>{t('authOff')}</button>
-        </div>
-      </form>
-    </div>
+    <Page title={`${t('appName')} · ${t('signIn')}`} onSubmit={submit}>
+      <Settings />
+      <PickOrType title={t('orgUuid')} options={orgs} value={org} onChange={(v) => { setOrg(v); setTenant(''); }} />
+      <PickOrType title={t('tenantUuid')} options={tenants} value={tenant} onChange={setTenant} />
+      <Field label={t('username')}><Input value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" required /></Field>
+      <Field label={t('password')}><Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" required /></Field>
+      <CaptchaField captcha={captcha} code={code} setCode={setCode} refresh={refresh} />
+      {error && <Alert variant="destructive">{error}</Alert>}
+      <Button type="submit" disabled={busy} className="w-full">{busy ? t('working') : t('signIn')}</Button>
+      <div className="flex flex-wrap justify-between gap-2">
+        <Button variant="link" className="h-auto p-0" onClick={() => { location.hash = '#/register'; }}>{t('noAccount')}</Button>
+        <Button variant="link" className="h-auto p-0" onClick={enterWithoutAuth}>{t('authOff')}</Button>
+      </div>
+    </Page>
   );
 }
 
@@ -185,24 +197,24 @@ export function Register() {
     finally { setCode(''); void refresh(); setBusy(false); }
   };
 
+  const text = (k: keyof typeof f, label: string, extra: React.ComponentProps<typeof Input> = {}) => (
+    <Field label={label}><Input value={f[k]} onChange={(e) => set(k)(e.target.value)} {...extra} /></Field>
+  );
   return (
-    <div className="auth">
-      <form className="card" onSubmit={submit}>
-        <h1>{t('appName')} · {t('register')}</h1>
-        <Settings />
-        <PickOrType title={t('orgUuid')} options={orgs} value={f.org} onChange={(v) => setF((p) => ({ ...p, org: v, tenant: '' }))} />
-        <PickOrType title={t('tenantUuid')} options={tenants} value={f.tenant} onChange={set('tenant')} />
-        <label className="field"><span>{t('username')}</span><input value={f.username} onChange={(e) => set('username')(e.target.value)} autoComplete="username" required /></label>
-        <label className="field"><span>{t('password')}</span><input type="password" value={f.password} onChange={(e) => set('password')(e.target.value)} autoComplete="new-password" required minLength={8} /></label>
-        <label className="field"><span>{t('email')}</span><input type="email" value={f.email} onChange={(e) => set('email')(e.target.value)} /></label>
-        <label className="field"><span>{t('phone')}</span><input value={f.phone} onChange={(e) => set('phone')(e.target.value)} inputMode="tel" /></label>
-        <label className="field"><span>{t('nickname')}</span><input value={f.nickname} onChange={(e) => set('nickname')(e.target.value)} /></label>
-        <CaptchaField captcha={captcha} code={code} setCode={setCode} refresh={refresh} />
-        {error && <div className="msg bad">{error}</div>}
-        {done && <div className="msg ok">{t('registered')}</div>}
-        <button className="primary" disabled={busy} style={{ width: '100%' }}>{busy ? t('working') : t('register')}</button>
-        <button type="button" className="link" onClick={() => { location.hash = '#/login'; }}>{t('haveAccount')}</button>
-      </form>
-    </div>
+    <Page title={`${t('appName')} · ${t('register')}`} onSubmit={submit}>
+      <Settings />
+      <PickOrType title={t('orgUuid')} options={orgs} value={f.org} onChange={(v) => setF((p) => ({ ...p, org: v, tenant: '' }))} />
+      <PickOrType title={t('tenantUuid')} options={tenants} value={f.tenant} onChange={set('tenant')} />
+      {text('username', t('username'), { autoComplete: 'username', required: true })}
+      {text('password', t('password'), { type: 'password', autoComplete: 'new-password', required: true, minLength: 8 })}
+      {text('email', t('email'), { type: 'email' })}
+      {text('phone', t('phone'), { inputMode: 'tel' })}
+      {text('nickname', t('nickname'))}
+      <CaptchaField captcha={captcha} code={code} setCode={setCode} refresh={refresh} />
+      {error && <Alert variant="destructive">{error}</Alert>}
+      {done && <Alert variant="success">{t('registered')}</Alert>}
+      <Button type="submit" disabled={busy} className="w-full">{busy ? t('working') : t('register')}</Button>
+      <Button variant="link" className="h-auto p-0" onClick={() => { location.hash = '#/login'; }}>{t('haveAccount')}</Button>
+    </Page>
   );
 }
