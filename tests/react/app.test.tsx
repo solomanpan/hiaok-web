@@ -1,13 +1,14 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import App from '../../apps/react/src/App';
+import App from '../../apps/app/src/App';
 
 const ok = (resultInfo: unknown) => new Response(JSON.stringify({ code: 0, msg: 'success', resultInfo }));
 const calls: { url: string; body: any }[] = [];
+const saved = { baseUrl: '', backend: 'hiaok', token: 'tok', orgUuid: 'o1', tenantUuid: 't1', userUuid: 'u1', locale: 'en' };
 
 beforeEach(() => {
-  localStorage.clear(); location.hash = '#/login'; calls.length = 0;
+  localStorage.clear(); calls.length = 0;
   vi.stubGlobal('fetch', vi.fn(async (url: string, init: RequestInit) => {
     const body = JSON.parse(String(init.body ?? '{}'));
     calls.push({ url, body });
@@ -23,24 +24,28 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
+const press = (el: Element) => fireEvent.click(el);
+const type = (input: Element, value: string) => fireEvent.change(input, { target: { value } });
+
 describe('sign in', () => {
   it('shows the captcha, logs in with it and lands on the resource list', async () => {
     render(<App />);
-    await waitFor(() => expect(screen.getByAltText(/captcha|验证码/i)).toBeTruthy());
-    await waitFor(() => expect(screen.getAllByRole('combobox').length).toBeGreaterThan(2)); // orgs loaded
-    const selects = screen.getAllByRole('combobox');
-    fireEvent.change(selects[2]!, { target: { value: 'o1' } });
-    await waitFor(() => expect(screen.getAllByRole('combobox').length).toBeGreaterThan(3));
-    fireEvent.change(screen.getAllByRole('combobox')[3]!, { target: { value: 't1' } });
-    const inputs = document.querySelectorAll('input');
-    const text = (i: number, v: string) => fireEvent.change(inputs[i]!, { target: { value: v } });
-    const find = (type: string) => Array.from(inputs).findIndex((x) => x.type === type);
-    text(find('password'), 'secret-pass');
-    const user = Array.from(inputs).findIndex((x) => x.autocomplete === 'username');
-    text(user, 'alice');
-    const code = Array.from(inputs).findIndex((x) => x.autocomplete === 'off');
-    text(code, 'ab12');
-    fireEvent.submit(document.querySelector('form')!);
+    await waitFor(() => expect(screen.getByLabelText('Refresh captcha')).toBeTruthy());
+    // organization and tenant come from the lists: pick them
+    await waitFor(() => expect(screen.getAllByText('Select…').length).toBeGreaterThan(0));
+    press(screen.getAllByText('Select…')[0]!);
+    press(await screen.findByText(/Acme/));
+    await waitFor(() => expect(calls.some((c) => c.url.endsWith('/tenant/list') && c.body.reqInfo.orgUuid === 'o1')).toBe(true));
+    await waitFor(() => expect(screen.queryAllByText('Select…')).toHaveLength(1)); // the org dialog is closed, the tenant list is in
+    press(screen.getByText('Select…'));
+    press(await screen.findByText(/Main/));
+
+    const inputs = Array.from(document.querySelectorAll('input'));
+    type(inputs.find((x) => x.autocomplete === 'username')!, 'alice');
+    type(inputs.find((x) => x.type === 'password')!, 'secret-pass');
+    type(inputs.find((x) => x.getAttribute('autocapitalize') === 'characters')!, 'ab12');
+    press(screen.getAllByText('Sign in').at(-1)!);
+
     await waitFor(() => expect(calls.some((c) => c.url.endsWith('/auth/login'))).toBe(true));
     const login = calls.find((c) => c.url.endsWith('/auth/login'))!;
     expect(login.body.reqInfo).toMatchObject({ orgUuid: 'o1', tenantUuid: 't1', username: 'alice', captchaId: 'c1', captchaCode: 'ab12' });
@@ -48,8 +53,7 @@ describe('sign in', () => {
   });
 
   it('lists a resource once signed in and sends the organization', async () => {
-    localStorage.setItem('hiaok-web.session', JSON.stringify({ baseUrl: '', backend: 'hiaok', token: 'tok', orgUuid: 'o1', tenantUuid: 't1', userUuid: 'u1', locale: 'en' }));
-    location.hash = '#/r/role';
+    localStorage.setItem('hiaok-web.session', JSON.stringify(saved));
     render(<App />);
     await waitFor(() => expect(screen.getByText('Admin')).toBeTruthy());
     const list = calls.find((c) => c.url.endsWith('/role/list'))!;
@@ -58,15 +62,15 @@ describe('sign in', () => {
   });
 
   it('hides what the user may not do, and signing out calls the server', async () => {
-    localStorage.setItem('hiaok-web.session', JSON.stringify({ baseUrl: '', backend: 'hiaok', token: 'tok', orgUuid: 'o1', tenantUuid: 't1', userUuid: 'u1', locale: 'en' }));
-    location.hash = '#/r/role';
+    localStorage.setItem('hiaok-web.session', JSON.stringify(saved));
     render(<App />);
     await waitFor(() => expect(screen.getByText('Admin')).toBeTruthy());
     await waitFor(() => expect(screen.queryByText('Delete')).toBeNull());      // no role:delete
-    expect(screen.getByText('Add')).toBeTruthy();                              // role:add
+    expect(screen.getByText('+ Add')).toBeTruthy();                            // role:add
+    press(screen.getByText('☰'));                                              // jsdom is "narrow": the menu is a drawer
     expect(screen.getAllByText('Role').length).toBeGreaterThan(0);
-    expect(screen.queryByText('Menu')).toBeNull();                             // menu is guarded, no menu:* code
-    fireEvent.click(screen.getByText('Sign out'));
+    expect(screen.queryByText('Menu')).toBeNull();                             // no menu:* code
+    press(screen.getByText('Sign out'));
     await waitFor(() => expect(calls.some((c) => c.url.endsWith('/auth/logout'))).toBe(true));
     await waitFor(() => expect(JSON.parse(localStorage.getItem('hiaok-web.session')!).token).toBeNull());
   });

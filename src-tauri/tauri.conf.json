@@ -4,13 +4,21 @@
   "version": "1.0.0",
   "identifier": "com.solomanpan.hiaok",
   "build": {
-    "frontendDist": "../apps/react/dist",
-    "devUrl": "http://localhost:5173",
-    "beforeDevCommand": "npm run dev:react",
-    "beforeBuildCommand": "npm run build -w @hiaok/react"
+    "frontendDist": "../apps/app/dist",
+    "devUrl": "http://localhost:8081",
+    "beforeDevCommand": "npm run web:serve -w @hiaok/app",
+    "beforeBuildCommand": "npm run build -w @hiaok/app"
   },
   "app": {
-    "windows": [{ "title": "hiaok", "width": 1180, "height": 780, "minWidth": 360, "minHeight": 520 }],
+    "windows": [
+      {
+        "title": "hiaok",
+        "width": 1180,
+        "height": 780,
+        "minWidth": 360,
+        "minHeight": 520
+      }
+    ],
     "security": {
       "csp": "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; connect-src *"
     }
@@ -18,6 +26,12 @@
   "bundle": {
     "active": true,
     "targets": "all",
-    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.icns", "icons/icon.ico"]
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ]
   }
 }

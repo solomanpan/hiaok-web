@@ -26,8 +26,9 @@ describe('access', () => {
     expect(principal().canOpen(role)).toBe(false);
     expect(principal('menu:tree').canOpen(resourceByName('menu'))).toBe(true);
   });
-  it('unguarded resources and a missing principal hide nothing', () => {
-    expect(principal().can(user, 'delete')).toBe(true);
+  it('every resource is guarded, and a missing principal hides nothing', () => {
+    expect(principal().can(user, 'delete')).toBe(false);
+    expect(principal('user:delete').can(user, 'delete')).toBe(true);
     expect(Access.everything.can(role, 'delete')).toBe(true);
   });
 });

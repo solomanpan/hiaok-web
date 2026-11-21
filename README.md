@@ -1,22 +1,16 @@
 # hiaok-web
 
-Front end of the **hiaok permission center** — React and Nuxt 3 (both TypeScript), plus a Tauri 2 shell so the same app runs on **desktop, Android and iOS**.
-
-[中文](#中文) · [日本語](#日本語)
-
-It talks to the hiaok back end (`POST /v1/api/hiaok/<resource>/<action>` with `{requestId, reqInfo}`) and covers every resource: organization, tenant, user, role, permission, menu, project, group, department, employee, config and log — list / filter / create / edit / delete, plus the special actions (assign roles, grant permissions, assign menus, change password, view authorities, move, appoint head, transfer, resign, update organization detail). Sign-in, registration and captcha are built in.
-
-## Layout
+Front end of the **hiaok permission center** — **one React Native (Expo) app in TypeScript** that runs on **iOS, Android, the web and the desktop**. It covers every resource of the hiaok API (and its Go / Rust ports): organizations, tenants, users, roles, permissions, menus, projects, groups, departments, employees, configs, logs — plus sign-in, registration and captcha.
 
 ```
-packages/api-client   typed client: envelope, ApiError, submit + poll for the asynchronous writes
-packages/core         the application, layered like the back ends (see below)
-apps/react            Vite + React 19 + Tailwind + shadcn/ui
-apps/nuxt             Nuxt 3, SPA (`ssr: false`) + Tailwind + shadcn-vue — same pages, same registry
-src-tauri             Tauri 2 shell (desktop + mobile) around the React build
+apps/app              Expo (React Native 0.88) + NativeWind (Tailwind CSS) — iOS, Android, web (react-native-web)
+packages/core         framework-free DDD core: domain / application / infrastructure
+packages/api-client   typed HTTP client for the hiaok API
+tests/                every test of the repository (separate from the source)
+src-tauri             Tauri 2 desktop shell around the Expo web export
 ```
 
-**UI**: Tailwind CSS v4 with shadcn/ui — `apps/react/src/components/ui` (Radix primitives) and, for Nuxt, the shadcn-vue counterpart `apps/nuxt/components/ui` (Reka UI). Both use the same theme tokens (`styles.css`: light/dark follows the OS, `--primary` etc.), so restyling is one file. The components are source files in the repo, as in shadcn: edit them freely. Selects are the styled native `<select>` (shadcn "native select"), which behaves best inside iOS / Android web views.
+**One app, four targets**: `expo start --ios/--android` runs native; `expo export -p web` builds the browser version; the **desktop** app is that web build inside a Tauri 2 window (no second UI to maintain). **UI**: NativeWind brings Tailwind classes to React Native; the components in `apps/app/src/ui.tsx` are shadcn-style source files (Button, Input, Select, Dialog, Checkbox, Alert, Badge, Card) and the theme tokens are in `apps/app/global.css`. Lists are shown as cards, which fit a phone as well as a desktop window.
 
 ### Layers (`packages/core/src`)
 
@@ -33,25 +27,26 @@ Dependencies point inward and a test enforces it (`tests/core/architecture.test.
 
 All tests live in the separate `tests/` bundle (`@hiaok/tests`: `api-client/`, `core/`, `react/`), never next to the source. Run them with `npm test`.
 
-Both apps render every list, form and action **from `RESOURCES`** — a new endpoint is a few lines in `packages/shared/src/resources.ts`, not a new page.
+The app depends only on `@hiaok/core` and calls use cases — it never sees HTTP. Another React front end (Next.js, a Vite SPA, ...) could reuse the same core unchanged.
+
+Every list, form and action is rendered **from `RESOURCES`** — a new endpoint is a few lines in `packages/core/src/domain/resources.ts`, not a new page.
 
 ## Run
 
 ```bash
 npm install
-npm run dev:react        # http://localhost:5173
-npm run dev:nuxt         # http://localhost:3000
-npm run typecheck && npm test && npm run build
+npm run web        # http://localhost:8081 (Expo web dev server)
+npm run ios        # simulator / device through Expo (macOS + Xcode)
+npm run android    # emulator / device through Expo (Android Studio)
 ```
 
-In dev, leave **Server URL** empty and `/v1` is proxied to `http://localhost:8000` (`VITE_API_PROXY` / `NUXT_API_PROXY` change the target). Against another host, set the Server URL on the sign-in page and allow the origin on the server:
+There is no dev proxy: enter the **Server URL** on the sign-in page (e.g. `http://localhost:8000`) and let the server accept the origin: `APP_CORS_ORIGINS=http://localhost:8081,tauri://localhost,http://tauri.localhost` (native apps do not use CORS). Turn the captcha on with `AUTH_CAPTCHA_ENABLED=true`. The **Backend** selector switches the URL prefix (`hiaok`, `kimoj`, `ladepa`).
 
+```bash
+npm test           # all tests (vitest; the app renders through react-native-web in jsdom)
+npm run typecheck
+npm run build      # expo export -p web  ->  apps/app/dist
 ```
-APP_CORS_ORIGINS=http://localhost:5173,http://localhost:3000,tauri://localhost,http://tauri.localhost
-AUTH_CAPTCHA_ENABLED=true     # optional: login and register then require a captcha
-```
-
-The **Backend** selector switches the URL prefix (`hiaok`, `kimoj`, `ladepa`) — the Go and Rust ports speak the same API.
 
 ## How the pages behave
 
@@ -60,40 +55,33 @@ The **Backend** selector switches the URL prefix (`hiaok`, `kimoj`, `ladepa`) �
 - **Writes** are asynchronous on the server (`accepted` first); the UI waits for the outcome through `log/get-by-request` and shows success or the failure reason.
 - `state` is `0 = enabled`, `1 = disabled`; `permType` / `menuType` are menu / api / button.
 - **Sign out** ends the session on the server too (`auth/logout`), then clears it locally even if the server is unreachable.
-- **Permissions**: for guarded resources (role, menu) the navigation and the buttons follow the user's permission codes (`role:list`, `role:*`, `*`); with auth off nothing is hidden.
+- **Permissions**: every resource is guarded on the server, so the navigation and the buttons follow the user's permission codes (`role:list`, `role:*`, `*`; the sign-in page's organization / tenant lists need `organization:list` / `tenant:list`, so with auth on you type the UUIDs); with auth off nothing is hidden.
 - Detail dialogs fetch the current row (`<resource>/get`); the log page looks up a command by request id, the config page a value by key.
-- Language (English / 中文 / 日本語) is switchable on every screen; the session is kept in local storage.
+- Language (English / 中文 / 日本語) is switchable on every screen; the session is kept in the platform's secure storage (keychain / keystore on iOS and Android, local storage on the web).
 
-## Desktop and mobile (Tauri 2)
+## Desktop (Tauri 2)
 
 ```bash
-npm run desktop:dev                       # desktop window around the Vite dev server
-npm run desktop:build                     # installers for the current OS
-npx tauri android init && npm run android:dev    # needs Android Studio / SDK / NDK
-npx tauri ios init     && npm run ios:dev        # macOS + Xcode only
+npm run desktop:dev       # a desktop window around the Expo web dev server
+npm run desktop:build     # installers; builds apps/app/dist first
 ```
 
-The shell only hosts the web view; the app speaks plain HTTP to the server. A mobile or packaged desktop app has its own origin, so put it in `APP_CORS_ORIGINS` (above) and use an `https://` Server URL in production (Android blocks cleartext by default). `app-icon.png` is a placeholder — replace it and run `npx tauri icon app-icon.png`. The Nuxt app is a static build too (`npm run build -w @hiaok/nuxt` → `apps/nuxt/.output/public`); point `frontendDist` there to ship it instead.
-
-> The Tauri desktop / Android / iOS builds need their native toolchains and have not been built in the authoring environment; the web apps are type-checked, tested and were exercised against a live hiaok server.
+> The native iOS / Android builds and the Tauri desktop bundles need their toolchains and have not been built in the authoring environment; the app type-checks, its web export builds, and the tests (core, API client, and the app in jsdom) pass.
 
 ## 中文
 
-hiaok 权限中心的前端：React 与 Nuxt 3（TypeScript），并用 Tauri 2 打包成 **桌面 / Android / iOS** 应用。覆盖 hiaok 全部接口资源（组织、租户、用户、角色、权限、菜单、项目、用户组、部门、员工、系统配置、日志），内置登录、注册与验证码。
+hiaok 权限中心的前端：**一套 React Native（Expo）TypeScript 代码**，同时运行在 **iOS / Android / Web / 桌面**。覆盖 hiaok 全部接口资源，含登录、注册、验证码。
 
-- 开发：`npm install && npm run dev:react`（或 `dev:nuxt`）；服务地址留空时 `/v1` 代理到 `localhost:8000`。
-- 服务端需允许来源：`APP_CORS_ORIGINS=http://localhost:5173,tauri://localhost`；开启验证码：`AUTH_CAPTCHA_ENABLED=true`。
-- 写操作在服务端是异步的，界面会自动轮询结果并显示成功或失败原因。
-- 移动端/桌面端构建见上文 Tauri 部分（需要各自的原生工具链）。
+- 目录：`apps/app`（Expo + NativeWind/Tailwind）、`packages/core`（不依赖框架的 DDD 核心）、`packages/api-client`、`tests/`（所有测试，与源码分离）、`src-tauri`（桌面壳）。
+- 开发：`npm install && npm run web`（或 `npm run ios` / `npm run android`）；在登录页填写服务地址，服务端需允许来源：`APP_CORS_ORIGINS=http://localhost:8081,tauri://localhost`；开启验证码：`AUTH_CAPTCHA_ENABLED=true`。
+- 桌面端：Tauri 2 包装 Expo 的 Web 构建（`npm run desktop:dev` / `desktop:build`）。
+- 测试：`npm test`（均位于 `tests/`）。原生与桌面构建需要各自的工具链，尚未在编写环境中实际构建。
 
 ## 日本語
 
-hiaok 権限センターのフロントエンド。React と Nuxt 3（TypeScript）、Tauri 2 で **デスクトップ / Android / iOS** に対応します。全リソース（組織・テナント・ユーザー・ロール・権限・メニュー・プロジェクト・グループ・部門・従業員・設定・ログ）を操作でき、ログイン・登録・認証コードを備えます。
+hiaok 権限センターのフロントエンド。**React Native（Expo）の TypeScript コード 1 本**で **iOS / Android / Web / デスクトップ**に対応します。hiaok の全リソースのほか、ログイン・登録・認証コードを備えます。
 
-- 開発: `npm install && npm run dev:react`（または `dev:nuxt`）。サーバー URL が空なら `/v1` は `localhost:8000` にプロキシされます。
-- サーバー側: `APP_CORS_ORIGINS=http://localhost:5173,tauri://localhost`、認証コードは `AUTH_CAPTCHA_ENABLED=true`。
-- 書き込みは非同期で、結果を自動でポーリングして表示します。
-
-## License
-
-MIT
+- 構成: `apps/app`（Expo + NativeWind/Tailwind）、`packages/core`（フレームワーク非依存の DDD コア）、`packages/api-client`、`tests/`（全テスト。ソースと分離）、`src-tauri`（デスクトップシェル）。
+- 開発: `npm install && npm run web`（または `npm run ios` / `npm run android`）。ログイン画面でサーバー URL を入力し、サーバー側で `APP_CORS_ORIGINS=http://localhost:8081,tauri://localhost` を許可、認証コードは `AUTH_CAPTCHA_ENABLED=true`。
+- デスクトップ: Tauri 2 が Expo の Web ビルドを包みます（`npm run desktop:dev` / `desktop:build`）。
+- テスト: `npm test`（すべて `tests/` 配下）。ネイティブ／デスクトップのビルドには各ツールチェーンが必要で、作成環境では未ビルドです。

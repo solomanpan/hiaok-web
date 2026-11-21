@@ -1,9 +1,25 @@
 {
   "compilerOptions": {
-    "target": "ES2022", "module": "ESNext", "moduleResolution": "Bundler", "jsx": "react-jsx",
-    "strict": true, "noUncheckedIndexedAccess": true, "skipLibCheck": true, "noEmit": true,
-    "baseUrl": ".", "paths": { "@/*": ["../apps/react/src/*"] },
-    "lib": ["ES2022", "DOM", "DOM.Iterable"], "types": ["node"]
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "jsx": "react-jsx",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "types": [
+      "node"
+    ]
   },
-  "include": ["**/*.ts", "**/*.tsx"]
+  "include": [
+    "**/*.ts",
+    "**/*.tsx",
+    "../apps/app/nativewind-env.d.ts"
+  ]
 }

@@ -1,8 +1,6 @@
 node_modules/
+.expo/
 dist/
-.output/
-.nuxt/
-.nitro/
 _to_delete/
 *.tsbuildinfo
 src-tauri/target/

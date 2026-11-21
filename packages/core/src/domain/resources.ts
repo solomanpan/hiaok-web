@@ -71,7 +71,6 @@ export interface ResourceDef {
   /** row fields holding objects / JSON, shown in the detail view */
   detailFields?: string[];
   /** the server guards every endpoint with `<name>:<endpoint>` permission codes (`role:list`, `menu:tree` ...) */
-  guarded?: boolean;
   /** a single-row lookup box beside the list: `log` by request id (outcome), `config` by key */
   lookup?: { field: string; use: 'outcome' | 'configByKey' };
 }
@@ -165,7 +164,7 @@ export const RESOURCES: ResourceDef[] = [
     ],
   },
   {
-    name: 'role', guarded: true, idField: 'roleUuid', scoped: true, nameField: 'roleName', remove: true,
+    name: 'role', idField: 'roleUuid', scoped: true, nameField: 'roleName', remove: true,
     columns: ['roleCode', 'roleName', 'roleType', 'state'],
     create: {
       fields: [
@@ -198,7 +197,7 @@ export const RESOURCES: ResourceDef[] = [
     update: { fields: [{ name: 'permName' }, ref('menuUuid', 'menu', 'menuUuid', 'menuName'), ...meta] },
   },
   {
-    name: 'menu', guarded: true, idField: 'menuUuid', scoped: true, nameField: 'menuName', remove: true, tree: true,
+    name: 'menu', idField: 'menuUuid', scoped: true, nameField: 'menuName', remove: true, tree: true,
     columns: ['menuCode', 'menuName', 'menuType', 'path', 'sortOrder', 'visible', 'state'],
     create: {
       fields: [
