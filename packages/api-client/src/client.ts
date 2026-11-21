@@ -52,9 +52,10 @@ export function createClient(opts: ClientOptions = {}) {
     const locale = opts.getLocale?.();
     if (locale) headers['accept-language'] = locale;
 
+    const url = `${base()}${prefix()}/${resource}/${action}`;
     let res: Response;
     try {
-      res = await doFetch(`${base()}${prefix()}/${resource}/${action}`, {
+      res = await doFetch(url, {
         method: 'POST',
         headers,
         body: JSON.stringify({ requestId, reqInfo }),
@@ -68,7 +69,7 @@ export function createClient(opts: ClientOptions = {}) {
     } catch {
       /* not JSON */
     }
-    if (!body) throw new ApiError(`HTTP ${res.status}: the reply is not a hiaok API response, check the Server URL`, res.status, 'bad_response', res.status);
+    if (!body) throw new ApiError(`HTTP ${res.status} from ${url}: not a hiaok API response, check the Server URL`, res.status, 'bad_response', res.status);
     if (body.code !== 0) {
       if (body.code === 401) opts.onUnauthenticated?.();
       throw new ApiError(body.msg, body.code, body.errorCode, res.status);
