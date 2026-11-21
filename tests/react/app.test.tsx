@@ -30,6 +30,12 @@ const type = (input: Element, value: string) => fireEvent.change(input, { target
 describe('sign in', () => {
   it('shows the captcha, logs in with it and lands on the resource list', async () => {
     render(<App />);
+    // without a server URL nothing is requested and signing in says so
+    await waitFor(() => expect(screen.getAllByText('Sign in').length).toBeGreaterThan(0));
+    press(screen.getAllByText('Sign in').at(-1)!);
+    await waitFor(() => expect(screen.getByText(/Required field missing: Server URL/)).toBeTruthy());
+    expect(calls).toHaveLength(0);
+    type(document.querySelector('input[placeholder="http://localhost:8000"]')!, 'http://localhost:8000/');
     await waitFor(() => expect(screen.getByLabelText('Refresh captcha')).toBeTruthy());
     // organization and tenant come from the lists: pick them
     await waitFor(() => expect(screen.getAllByText('Select…').length).toBeGreaterThan(0));

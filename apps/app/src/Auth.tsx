@@ -43,9 +43,13 @@ function PickOrType({ title, options, value, onChange }: { title: string; option
 }
 
 export function useCaptcha() {
-  const { app } = useApp();
+  const { app, session } = useApp();
   const [captcha, setCaptcha] = useState<Captcha | null>(null);
-  const refresh = useCallback(async () => { setCaptcha(await app.auth.captcha.execute()); }, [app]);
+  const url = session.baseUrl;
+  const refresh = useCallback(async () => {
+    if (!url) { setCaptcha(null); return; } // no server yet: nothing to ask
+    try { setCaptcha(await app.auth.captcha.execute()); } catch { setCaptcha(null); }
+  }, [app, url]);
   return { captcha, refresh };
 }
 
@@ -70,7 +74,7 @@ function Settings() {
   const { session, update, t } = useApp();
   return (
     <View className="gap-3">
-      <Field label={t('serverUrl')}>
+      <Field label={`${t('serverUrl')} *`}>
         <Input value={session.baseUrl} onChangeText={(v) => update({ baseUrl: v.trim() })} placeholder="http://localhost:8000" keyboardType="url" />
       </Field>
       <View className="flex-row gap-3">
@@ -94,11 +98,13 @@ function useOrgTenant(org: string) {
   const [tenants, setTenants] = useState<Choice[]>([]);
   useEffect(() => {
     let live = true;
+    if (!session.baseUrl) { setOrgs([]); return; }
     void app.auth.choices.organizations().then((c) => live && setOrgs(c));
     return () => { live = false; };
   }, [app, session.baseUrl, session.backend]);
   useEffect(() => {
     let live = true;
+    if (!session.baseUrl) { setTenants([]); return; }
     void app.auth.choices.tenants(org).then((c) => live && setTenants(c));
     return () => { live = false; };
   }, [app, org, session.baseUrl]);
@@ -119,6 +125,7 @@ export function Login() {
   useEffect(() => { void refresh(); }, [refresh, session.baseUrl, session.backend]);
 
   const submit = async () => {
+    if (!session.baseUrl) { setError(`${t('fieldRequired')}: ${t('serverUrl')}`); return; }
     setBusy(true); setError('');
     try {
       await app.auth.signIn.execute({
@@ -133,6 +140,7 @@ export function Login() {
 
   // the server runs with AUTH_ENABLED=false: there is nothing to sign in to
   const enterWithoutAuth = async () => {
+    if (!session.baseUrl) { setError(`${t('fieldRequired')}: ${t('serverUrl')}`); return; }
     setError('');
     try {
       await app.auth.enterWithoutAuth.execute({ orgUuid: org, tenantUuid: tenant });
@@ -171,6 +179,7 @@ export function Register() {
   const set = (k: keyof typeof f) => (v: string) => setF((p) => ({ ...p, [k]: v }));
 
   const submit = async () => {
+    if (!session.baseUrl) { setError(`${t('fieldRequired')}: ${t('serverUrl')}`); return; }
     setBusy(true); setError(''); setDone(false);
     try {
       await app.auth.register.execute({
