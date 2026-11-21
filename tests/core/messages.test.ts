@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { detectLocale, messages } from '../index';
+import { detectLocale, messages } from '@hiaok/core';
 
 describe('messages', () => {
   it('every language has every key', () => {

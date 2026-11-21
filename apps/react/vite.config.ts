@@ -14,5 +14,4 @@ export default defineConfig({
     // dev: leave "Server URL" empty and the API is reached through this proxy (no CORS needed)
     proxy: { '/v1': process.env.VITE_API_PROXY ?? 'http://localhost:8000' },
   },
-  test: { environment: 'jsdom', globals: false },
 });

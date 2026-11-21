@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createHiaokApp, createHttpGateways, emptySession, LocalSessionStore, SessionManager, type KeyValueStorage, type Session } from '../index';
+import { createHiaokApp, createHttpGateways, emptySession, LocalSessionStore, SessionManager, type KeyValueStorage, type Session } from '@hiaok/core';
 
 const memory = (): KeyValueStorage => {
   const m = new Map<string, string>();

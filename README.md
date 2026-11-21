@@ -29,7 +29,9 @@ app.ts            composition root: createHiaokApp() wires use cases to adapters
 i18n/             messages and labels (en / zh / ja)
 ```
 
-Dependencies point inward and a test enforces it (`architecture.test.ts`): `domain` imports nothing outside itself, `application` never touches `infrastructure` or the HTTP client. The React and Nuxt apps depend only on `@hiaok/core` and call use cases — they never see HTTP. Tests swap the gateways for fakes.
+Dependencies point inward and a test enforces it (`tests/core/architecture.test.ts`): `domain` imports nothing outside itself, `application` never touches `infrastructure` or the HTTP client. The React and Nuxt apps depend only on `@hiaok/core` and call use cases — they never see HTTP. Tests swap the gateways for fakes.
+
+All tests live in the separate `tests/` bundle (`@hiaok/tests`: `api-client/`, `core/`, `react/`), never next to the source. Run them with `npm test`.
 
 Both apps render every list, form and action **from `RESOURCES`** — a new endpoint is a few lines in `packages/shared/src/resources.ts`, not a new page.
 

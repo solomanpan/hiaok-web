@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   actionRequest, changes, createRequest, deleteRequest, formatCell, humanize, initialValues, label, listRequest,
   missingRequired, RESOURCES, resourceByName, updateRequest, emptySession, LoadFieldOptions, SessionManager, type Row, type ResourceGateway, type Session, type SessionStore,
-} from '../index';
+} from '@hiaok/core';
 
 const session = { ...emptySession(), orgUuid: 'org-1', tenantUuid: 'ten-1' };
 const res = resourceByName;

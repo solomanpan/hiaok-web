@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Access, emptySession, isSignedIn, resourceByName, signedOut } from '../index';
+import { Access, emptySession, isSignedIn, resourceByName, signedOut } from '@hiaok/core';
 
 describe('session', () => {
   it('is signed in with a token, or with a known user when the server has auth off', () => {

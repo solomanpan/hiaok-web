@@ -5,12 +5,13 @@
   "description": "Web / desktop / mobile console for the hiaok permission center (React and Nuxt front ends, Tauri 2 shell)",
   "license": "MIT",
   "workspaces": [
+    "tests",
     "packages/*",
     "apps/*"
   ],
   "scripts": {
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "test": "npm run test --workspaces --if-present",
+    "test": "npm run test -w @hiaok/tests",
     "build": "npm run build --workspaces --if-present",
     "dev:react": "npm run dev -w @hiaok/react",
     "dev:nuxt": "npm run dev -w @hiaok/nuxt",

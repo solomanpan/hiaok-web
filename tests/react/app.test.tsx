@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import App from './App';
+import App from '../../apps/react/src/App';
 
 const ok = (resultInfo: unknown) => new Response(JSON.stringify({ code: 0, msg: 'success', resultInfo }));
 const calls: { url: string; body: any }[] = [];

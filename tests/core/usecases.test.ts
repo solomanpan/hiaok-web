@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   createApp, emptySession, resourceByName, SessionManager,
   type AuthGateway, type ResourceGateway, type Session, type SessionStore,
-} from '../index';
+} from '@hiaok/core';
 
 function setup(over: { auth?: Partial<AuthGateway>; resources?: Partial<ResourceGateway> } = {}) {
   const saved: Session[] = [];
