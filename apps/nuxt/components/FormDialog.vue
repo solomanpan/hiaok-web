@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import { loadOptions, missingRequired, type FieldDef, type Option, type Values } from '@hiaok/shared';
+import { missingRequired, type FieldDef, type Option, type Values } from '@hiaok/core';
 
 const props = defineProps<{
   title: string; fields: FieldDef[]; initial: Values; submitLabel?: string;
   onSubmit: (values: Values) => Promise<unknown>;
 }>();
 const emit = defineEmits<{ close: [] }>();
-const { client, session, t, l } = useApp();
+const { app, t, l } = useApp();
 const values = reactive<Values>({ ...props.initial });
 const options = reactive<Record<string, Option[]>>({});
 const error = ref('');
@@ -14,7 +14,7 @@ const busy = ref(false);
 
 onMounted(() => {
   for (const f of props.fields.filter((x) => x.ref || x.options)) {
-    loadOptions(client, f, session.value).then((o) => { options[f.name] = o; }).catch(() => undefined);
+    app.resources.options.execute(f).then((o) => { options[f.name] = o; }).catch(() => undefined);
   }
 });
 

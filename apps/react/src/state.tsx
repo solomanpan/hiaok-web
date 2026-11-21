@@ -1,13 +1,12 @@
-import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from 'react';
-import type { Client } from '@hiaok/api-client';
-import {
-  clearSession, clientFor, label, loadSession, saveSession, translate,
-  type Locale, type MessageKey, type Session,
-} from '@hiaok/shared';
+import { createContext, useContext, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { Access, createHiaokApp, label, translate, type App, type Locale, type MessageKey, type Session } from '@hiaok/core';
 
-interface App {
+interface AppContext {
+  /** the use cases — the only way the UI reaches the server */
+  app: App;
   session: Session;
-  client: Client;
+  /** what the signed-in user may do (everything visible until the server says otherwise) */
+  access: Access;
   update: (patch: Partial<Session>) => void;
   signOut: () => void;
   t: (key: MessageKey) => string;
@@ -15,42 +14,35 @@ interface App {
   locale: Locale;
 }
 
-const Ctx = createContext<App | null>(null);
+const Ctx = createContext<AppContext | null>(null);
 
-export function AppProvider({ children }: { children: ReactNode }) {
-  const [session, setSession] = useState<Session>(() => loadSession(undefined, navigator.language));
-  const ref = useRef(session);
-  ref.current = session;
+export function AppProvider({ children, app: injected }: { children: ReactNode; app?: App }) {
+  const app = useMemo(() => injected ?? createHiaokApp(), [injected]);
+  const session = useSyncExternalStore(app.sessions.subscribe, app.sessions.get);
+  const [access, setAccess] = useState<Access>(Access.everything);
 
-  const update = useCallback((patch: Partial<Session>) => {
-    const next = { ...ref.current, ...patch };
-    ref.current = next;
-    saveSession(next);
-    setSession(next);
-  }, []);
+  const signedIn = Boolean(session.token) || Boolean(session.userUuid);
+  useEffect(() => {
+    let live = true;
+    if (!signedIn) { setAccess(Access.everything); return; }
+    void app.auth.access.execute().then((a) => live && setAccess(a));
+    return () => { live = false; };
+  }, [app, signedIn, session.token, session.baseUrl, session.backend]);
 
-  const signOut = useCallback(() => {
-    const next = clearSession();
-    ref.current = next;
-    setSession(next);
-    location.hash = '#/login';
-  }, []);
-
-  // one client for the whole app; it reads the current session on every call
-  const client = useMemo(() => clientFor(() => ref.current, () => signOut()), [signOut]);
-
-  const value = useMemo<App>(
+  const value = useMemo<AppContext>(
     () => ({
-      session, client, update, signOut, locale: session.locale,
+      app, session, access, locale: session.locale,
+      update: (patch) => app.sessions.update(patch),
+      signOut: () => { void app.auth.signOut.execute().then(() => { location.hash = '#/login'; }); },
       t: (key) => translate(session.locale, key),
       l: (name) => label(session.locale, name),
     }),
-    [session, client, update, signOut],
+    [app, session, access],
   );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 
-export function useApp(): App {
+export function useApp(): AppContext {
   const v = useContext(Ctx);
   if (!v) throw new Error('AppProvider missing');
   return v;
@@ -59,7 +51,7 @@ export function useApp(): App {
 /** Tiny hash router: works from file:// and inside the Tauri webview without server rewrites. */
 export function useRoute(): string {
   const [hash, setHash] = useState(location.hash.slice(1) || '/');
-  useMemo(() => {
+  useEffect(() => {
     const on = () => setHash(location.hash.slice(1) || '/');
     window.addEventListener('hashchange', on);
     return () => window.removeEventListener('hashchange', on);

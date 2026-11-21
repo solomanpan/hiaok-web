@@ -1,5 +1,5 @@
 {
-  "name": "@hiaok/shared",
+  "name": "@hiaok/core",
   "version": "1.0.0",
   "type": "module",
   "main": "src/index.ts",

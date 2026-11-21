@@ -1,5 +1,5 @@
 import type { Locale } from './messages';
-import { enumLabelKey } from './operations';
+import { enumLabelKey } from '../domain/resources';
 
 /** [field / word, zh, ja]; English is derived from the name (`orgCode` -> "Org code"). */
 const WORDS: [string, string, string][] = [
@@ -31,7 +31,7 @@ const WORDS: [string, string, string][] = [
   ['detail', '详情', '詳細'], ['roles', '角色', 'ロール'],
   ['legalName', '法定名称', '正式名称'], ['registrationNo', '注册号', '登録番号'], ['address', '地址', '住所'], ['postalCode', '邮编', '郵便番号'],
   ['contactName', '联系人', '連絡先名'], ['contactPhone', '联系电话', '連絡先電話'], ['contactEmail', '联系邮箱', '連絡先メール'], ['website', '网站', 'ウェブサイト'],
-  ['projectUuid', '项目', 'プロジェクト'], ['captchaCode', '验证码', '認証コード'],
+  ['requestId', '请求 ID', 'リクエスト ID'], ['projectUuid', '项目', 'プロジェクト'], ['captchaCode', '验证码', '認証コード'],
   // enumerations
   ['enabled', '启用', '有効'], ['disabled', '停用', '無効'], ['menu', '菜单', 'メニュー'], ['api', '接口', 'API'], ['button', '按钮', 'ボタン'],
   ['system', '系统', 'システム'], ['custom', '自定义', 'カスタム'],

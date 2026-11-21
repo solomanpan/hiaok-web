@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { LOCALES, RESOURCES, type Locale } from '@hiaok/shared';
+import { LOCALES, RESOURCES, type Locale } from '@hiaok/core';
 import { Menu, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,10 +10,11 @@ import { ResourcePage } from './ResourcePage';
 import { AppProvider, useApp, useRoute } from './state';
 
 function Shell({ route }: { route: string }) {
-  const { session, update, signOut, t, l } = useApp();
+  const { session, access, update, signOut, t, l } = useApp();
+  const visible = RESOURCES.filter((r) => access.canOpen(r));
   const [open, setOpen] = useState(false);
-  const name = route.startsWith('/r/') ? route.slice(3) : RESOURCES[0]!.name;
-  const known = RESOURCES.some((r) => r.name === name);
+  const name = route.startsWith('/r/') ? route.slice(3) : (visible[0] ?? RESOURCES[0]!).name;
+  const known = visible.some((r) => r.name === name);
   useEffect(() => setOpen(false), [route]);
   return (
     <div className="min-h-dvh md:grid md:grid-cols-[14rem_1fr]">
@@ -28,7 +29,7 @@ function Shell({ route }: { route: string }) {
       )}>
         <b className="px-3 py-2 text-lg">{t('appName')}</b>
         <div className="flex-1 space-y-0.5 overflow-auto">
-          {RESOURCES.map((r) => (
+          {visible.map((r) => (
             <a key={r.name} href={`#/r/${r.name}`} className={cn(
               'block rounded-md px-3 py-2 text-sm font-medium hover:bg-accent',
               r.name === name && 'bg-primary text-primary-foreground hover:bg-primary/90',

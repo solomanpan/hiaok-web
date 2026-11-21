@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import type { Option } from '@hiaok/shared';
-const props = defineProps<{ title: string; options: Option[]; modelValue: string }>();
+import type { Choice } from '@hiaok/core';
+const props = defineProps<{ title: string; options: Choice[]; modelValue: string }>();
 const emit = defineEmits<{ 'update:modelValue': [string] }>();
 const { t } = useApp();
 const manual = ref(props.options.length === 0);

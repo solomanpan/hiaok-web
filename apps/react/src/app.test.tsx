@@ -15,6 +15,8 @@ beforeEach(() => {
     if (url.endsWith('/organization/list')) return ok({ items: [{ orgUuid: 'o1', orgName: 'Acme', orgCode: 'ACME' }], total: 1, offset: 0, limit: 200 });
     if (url.endsWith('/tenant/list')) return ok({ items: [{ tenantUuid: 't1', tenantName: 'Main', tenantCode: 'MAIN' }], total: 1, offset: 0, limit: 200 });
     if (url.endsWith('/auth/login')) return ok({ accessToken: 'tok', tokenType: 'Bearer', expiresIn: 7200, userUuid: 'u1' });
+    if (url.endsWith('/auth/me')) return ok({ userUuid: 'u1', orgUuid: 'o1', tenantUuid: 't1', roleCodes: [], permissionCodes: ['role:list', 'role:add'] });
+    if (url.endsWith('/auth/logout')) return ok({});
     if (url.endsWith('/role/list')) return ok({ items: [{ roleUuid: 'r1', roleCode: 'admin', roleName: 'Admin', roleType: 0, state: 0 }], total: 1, offset: 0, limit: 20 });
     return ok({ items: [], total: 0, offset: 0, limit: 20 });
   }));
@@ -53,5 +55,19 @@ describe('sign in', () => {
     const list = calls.find((c) => c.url.endsWith('/role/list'))!;
     expect(list.body.reqInfo).toMatchObject({ orgUuid: 'o1', offset: 0, limit: 20 });
     expect(screen.getByText('Enabled')).toBeTruthy();
+  });
+
+  it('hides what the user may not do, and signing out calls the server', async () => {
+    localStorage.setItem('hiaok-web.session', JSON.stringify({ baseUrl: '', backend: 'hiaok', token: 'tok', orgUuid: 'o1', tenantUuid: 't1', userUuid: 'u1', locale: 'en' }));
+    location.hash = '#/r/role';
+    render(<App />);
+    await waitFor(() => expect(screen.getByText('Admin')).toBeTruthy());
+    await waitFor(() => expect(screen.queryByText('Delete')).toBeNull());      // no role:delete
+    expect(screen.getByText('Add')).toBeTruthy();                              // role:add
+    expect(screen.getAllByText('Role').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Menu')).toBeNull();                             // menu is guarded, no menu:* code
+    fireEvent.click(screen.getByText('Sign out'));
+    await waitFor(() => expect(calls.some((c) => c.url.endsWith('/auth/logout'))).toBe(true));
+    await waitFor(() => expect(JSON.parse(localStorage.getItem('hiaok-web.session')!).token).toBeNull());
   });
 });

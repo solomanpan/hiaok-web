@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
-import { loadOptions, missingRequired, type FieldDef, type Option, type Values } from '@hiaok/shared';
+import { missingRequired, type FieldDef, type Option, type Values } from '@hiaok/core';
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -64,7 +64,7 @@ export function FormDialog({ title, fields, initial, onSubmit, onClose, submitLa
   title: string; fields: FieldDef[]; initial: Values; submitLabel?: string;
   onSubmit: (values: Values) => Promise<unknown>; onClose: () => void;
 }) {
-  const { client, session, t, l } = useApp();
+  const { app, t, l } = useApp();
   const [values, setValues] = useState<Values>(initial);
   const [options, setOptions] = useState<Record<string, Option[]>>({});
   const [error, setError] = useState('');
@@ -73,10 +73,10 @@ export function FormDialog({ title, fields, initial, onSubmit, onClose, submitLa
   useEffect(() => {
     let live = true;
     fields.filter((f) => f.ref || f.options).forEach((f) => {
-      loadOptions(client, f, session).then((o) => live && setOptions((p) => ({ ...p, [f.name]: o }))).catch(() => undefined);
+      app.resources.options.execute(f).then((o) => live && setOptions((p) => ({ ...p, [f.name]: o }))).catch(() => undefined);
     });
     return () => { live = false; };
-  }, [client, session, fields]);
+  }, [app, fields]);
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();

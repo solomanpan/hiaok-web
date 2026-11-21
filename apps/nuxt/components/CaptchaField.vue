@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { Captcha } from '@hiaok/api-client';
+import type { Captcha } from '@hiaok/core';
 defineProps<{ captcha: Captcha | null; modelValue: string }>();
 const emit = defineEmits<{ 'update:modelValue': [string]; refresh: [] }>();
 const { t } = useApp();

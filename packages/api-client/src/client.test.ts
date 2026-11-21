@@ -107,3 +107,19 @@ describe('captcha', () => {
     await expect(client.auth.login({ orgUuid: 'o', tenantUuid: 't', username: 'a', password: 'p' })).rejects.toMatchObject({ errorCode: 'captcha_invalid' });
   });
 });
+
+describe('live options', () => {
+  it('the server URL and prefix are read on every call', async () => {
+    const urls: string[] = [];
+    const o = { baseUrl: 'http://a', prefix: '/v1/api/hiaok' };
+    const client = createClient({
+      get baseUrl() { return o.baseUrl; },
+      get prefix() { return o.prefix; },
+      fetch: (async (u: string) => { urls.push(u); return new Response(JSON.stringify({ code: 0, msg: 'ok', resultInfo: {} })); }) as unknown as typeof fetch,
+    });
+    await client.call('role', 'list', {});
+    o.baseUrl = 'http://b/'; o.prefix = '/v1/api/ladepa';
+    await client.call('role', 'list', {});
+    expect(urls).toEqual(['http://a/v1/api/hiaok/role/list', 'http://b/v1/api/ladepa/role/list']);
+  });
+});

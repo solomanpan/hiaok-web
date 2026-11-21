@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { LogOut, Menu } from 'lucide-vue-next';
-import { LOCALES, RESOURCES, type Locale } from '@hiaok/shared';
+import { LOCALES, RESOURCES, type Locale } from '@hiaok/core';
 import { cn } from '@/lib/utils';
-const { session, update, signOut, t, l } = useApp();
+const { session, access, update, signOut, t, l } = useApp();
+const visible = computed(() => RESOURCES.filter((r) => access.value.canOpen(r)));
 const route = useRoute();
 const open = ref(false);
 watch(() => route.fullPath, () => { open.value = false; });
@@ -20,7 +21,7 @@ const isAuth = computed(() => route.path === '/login' || route.path === '/regist
     <nav :class="cn('fixed inset-y-0 left-0 z-40 flex w-60 -translate-x-full flex-col gap-1 border-r bg-card p-3 pt-[max(0.75rem,env(safe-area-inset-top))] transition-transform md:sticky md:top-0 md:h-dvh md:w-auto md:translate-x-0', open && 'translate-x-0')">
       <b class="px-3 py-2 text-lg">{{ t('appName') }}</b>
       <div class="flex-1 space-y-0.5 overflow-auto">
-        <NuxtLink v-for="r in RESOURCES" :key="r.name" :to="`/r/${r.name}`"
+        <NuxtLink v-for="r in visible" :key="r.name" :to="`/r/${r.name}`"
           class="block rounded-md px-3 py-2 text-sm font-medium hover:bg-accent"
           active-class="!bg-primary !text-primary-foreground">{{ l(r.name) }}</NuxtLink>
       </div>

@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
-import type { Captcha } from '@hiaok/api-client';
-import { BACKENDS, LOCALES, listOrganizations, listTenants, type Backend, type Locale, type Option } from '@hiaok/shared';
+import { BACKENDS, LOCALES, type Backend, type Captcha, type Choice, type Locale } from '@hiaok/core';
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -22,7 +21,7 @@ const Page = ({ title, onSubmit, children }: { title: string; onSubmit: (e: Form
 );
 
 /** A select that falls back to a free UUID input when the list is empty or not available. */
-function PickOrType({ title, options, value, onChange }: { title: string; options: Option[]; value: string; onChange: (v: string) => void }) {
+function PickOrType({ title, options, value, onChange }: { title: string; options: Choice[]; value: string; onChange: (v: string) => void }) {
   const { t } = useApp();
   const [manual, setManual] = useState(options.length === 0);
   useEffect(() => { setManual(options.length === 0); }, [options.length]);
@@ -47,11 +46,9 @@ function PickOrType({ title, options, value, onChange }: { title: string; option
 }
 
 export function useCaptcha() {
-  const { client } = useApp();
+  const { app } = useApp();
   const [captcha, setCaptcha] = useState<Captcha | null>(null);
-  const refresh = useCallback(async () => {
-    try { setCaptcha(await client.auth.captcha()); } catch { setCaptcha(null); }
-  }, [client]);
+  const refresh = useCallback(async () => { setCaptcha(await app.auth.captcha.execute()); }, [app]);
   return { captcha, refresh };
 }
 
@@ -94,29 +91,24 @@ function Settings() {
 
 /** Organizations / tenants from the open list endpoints; empty lists mean manual entry. */
 function useOrgTenant(org: string) {
-  const { client, session } = useApp();
-  const [orgs, setOrgs] = useState<Option[]>([]);
-  const [tenants, setTenants] = useState<Option[]>([]);
+  const { app, session } = useApp();
+  const [orgs, setOrgs] = useState<Choice[]>([]);
+  const [tenants, setTenants] = useState<Choice[]>([]);
   useEffect(() => {
     let live = true;
-    listOrganizations(client)
-      .then((p) => live && setOrgs(p.items.map((o) => ({ value: String(o.orgUuid), label: `${o.orgName} (${o.orgCode})` }))))
-      .catch(() => live && setOrgs([]));
+    void app.auth.choices.organizations().then((c) => live && setOrgs(c));
     return () => { live = false; };
-  }, [client, session.baseUrl, session.backend]);
+  }, [app, session.baseUrl, session.backend]);
   useEffect(() => {
     let live = true;
-    if (!org) { setTenants([]); return; }
-    listTenants(client, org)
-      .then((p) => live && setTenants(p.items.map((x) => ({ value: String(x.tenantUuid), label: `${x.tenantName} (${x.tenantCode})` }))))
-      .catch(() => live && setTenants([]));
+    void app.auth.choices.tenants(org).then((c) => live && setTenants(c));
     return () => { live = false; };
-  }, [client, org, session.baseUrl]);
+  }, [app, org, session.baseUrl]);
   return { orgs, tenants };
 }
 
 export function Login() {
-  const { client, session, update, t } = useApp();
+  const { app, session, t } = useApp();
   const [org, setOrg] = useState(session.orgUuid);
   const [tenant, setTenant] = useState(session.tenantUuid);
   const [username, setUsername] = useState('');
@@ -132,11 +124,10 @@ export function Login() {
     e.preventDefault();
     setBusy(true); setError('');
     try {
-      const r = await client.auth.login({
+      await app.auth.signIn.execute({
         orgUuid: org, tenantUuid: tenant, username, password,
         ...(captcha?.required ? { captchaId: captcha.captchaId ?? undefined, captchaCode: code } : {}),
       });
-      update({ token: r.accessToken, orgUuid: org, tenantUuid: tenant, userUuid: r.userUuid });
       location.hash = '#/';
     } catch (err) {
       setError(errorText(err)); setCode(''); void refresh(); // a captcha is single-use, even after a wrong answer
@@ -147,8 +138,7 @@ export function Login() {
   const enterWithoutAuth = async () => {
     setError('');
     try {
-      const me = await client.auth.me();
-      update({ token: null, orgUuid: org || me.orgUuid, tenantUuid: tenant || me.tenantUuid, userUuid: me.userUuid });
+      await app.auth.enterWithoutAuth.execute({ orgUuid: org, tenantUuid: tenant });
       location.hash = '#/';
     } catch (err) { setError(errorText(err)); }
   };
@@ -172,7 +162,7 @@ export function Login() {
 }
 
 export function Register() {
-  const { client, session, t } = useApp();
+  const { app, session, t } = useApp();
   const [f, setF] = useState({ org: session.orgUuid, tenant: session.tenantUuid, username: '', password: '', email: '', phone: '', nickname: '' });
   const [code, setCode] = useState('');
   const [error, setError] = useState('');
@@ -187,7 +177,7 @@ export function Register() {
     e.preventDefault();
     setBusy(true); setError(''); setDone(false);
     try {
-      await client.users.register({
+      await app.auth.register.execute({
         orgUuid: f.org, tenantUuid: f.tenant, username: f.username, password: f.password,
         ...(f.email ? { email: f.email } : {}), ...(f.phone ? { phone: f.phone } : {}), ...(f.nickname ? { nickname: f.nickname } : {}),
         ...(captcha?.required ? { captchaId: captcha.captchaId ?? undefined, captchaCode: code } : {}),

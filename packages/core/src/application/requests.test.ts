@@ -1,9 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
-  actionRequest, changes, collect, createRequest, deleteRequest, formatCell, humanize, initialValues, label, listRequest,
-  loadOptions, missingRequired, RESOURCES, resourceByName, updateRequest, emptySession, type Row,
-} from './index';
-import { createClient } from '@hiaok/api-client';
+  actionRequest, changes, createRequest, deleteRequest, formatCell, humanize, initialValues, label, listRequest,
+  missingRequired, RESOURCES, resourceByName, updateRequest, emptySession, LoadFieldOptions, SessionManager, type Row, type ResourceGateway, type Session, type SessionStore,
+} from '../index';
 
 const session = { ...emptySession(), orgUuid: 'org-1', tenantUuid: 'ten-1' };
 const res = resourceByName;
@@ -127,16 +126,16 @@ describe('display and options', () => {
   });
 
   it('loads select options from the referenced list, scoped to the organization', async () => {
-    const calls: string[] = [];
-    const client = createClient({
-      fetch: (async (url: string, init: RequestInit) => {
-        calls.push(`${url} ${init.body}`);
-        return new Response(JSON.stringify({ code: 0, msg: 'success', resultInfo: { items: [{ roleUuid: 'r1', roleName: 'Admin' }], total: 1, offset: 0, limit: 200 } }));
-      }) as unknown as typeof fetch,
-    });
+    const calls: [string, object][] = [];
+    const gateway = {
+      list: async (resource: string, request: object) => {
+        calls.push([resource, request]);
+        return { items: [{ roleUuid: 'r1', roleName: 'Admin' }], total: 1, offset: 0, limit: 200 };
+      },
+    } as unknown as ResourceGateway;
+    const store: SessionStore = { load: () => session as Session, save: () => undefined };
     const field = res('user').create!.fields.find((f) => f.name === 'roleUuids')!;
-    expect(await loadOptions(client, field, session)).toEqual([{ value: 'r1', label: 'Admin' }]);
-    expect(calls[0]).toContain('/v1/api/hiaok/role/list');
-    expect(calls[0]).toContain('"orgUuid":"org-1"');
+    expect(await new LoadFieldOptions(gateway, new SessionManager(store)).execute(field)).toEqual([{ value: 'r1', label: 'Admin' }]);
+    expect(calls[0]).toEqual(['role', { orgUuid: 'org-1', offset: 0, limit: 200 }]);
   });
 });

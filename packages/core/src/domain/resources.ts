@@ -70,6 +70,10 @@ export interface ResourceDef {
   tree?: boolean;
   /** row fields holding objects / JSON, shown in the detail view */
   detailFields?: string[];
+  /** the server guards every endpoint with `<name>:<endpoint>` permission codes (`role:list`, `menu:tree` ...) */
+  guarded?: boolean;
+  /** a single-row lookup box beside the list: `log` by request id (outcome), `config` by key */
+  lookup?: { field: string; use: 'outcome' | 'configByKey' };
 }
 
 const TYPE3: Option[] = [
@@ -161,7 +165,7 @@ export const RESOURCES: ResourceDef[] = [
     ],
   },
   {
-    name: 'role', idField: 'roleUuid', scoped: true, nameField: 'roleName', remove: true,
+    name: 'role', guarded: true, idField: 'roleUuid', scoped: true, nameField: 'roleName', remove: true,
     columns: ['roleCode', 'roleName', 'roleType', 'state'],
     create: {
       fields: [
@@ -194,7 +198,7 @@ export const RESOURCES: ResourceDef[] = [
     update: { fields: [{ name: 'permName' }, ref('menuUuid', 'menu', 'menuUuid', 'menuName'), ...meta] },
   },
   {
-    name: 'menu', idField: 'menuUuid', scoped: true, nameField: 'menuName', remove: true, tree: true,
+    name: 'menu', guarded: true, idField: 'menuUuid', scoped: true, nameField: 'menuName', remove: true, tree: true,
     columns: ['menuCode', 'menuName', 'menuType', 'path', 'sortOrder', 'visible', 'state'],
     create: {
       fields: [
@@ -259,7 +263,7 @@ export const RESOURCES: ResourceDef[] = [
     ],
   },
   {
-    name: 'config', idField: 'configUuid', scoped: true, nameField: 'configKey', remove: true,
+    name: 'config', lookup: { field: 'configKey', use: 'configByKey' }, idField: 'configUuid', scoped: true, nameField: 'configKey', remove: true,
     columns: ['configKey', 'configValue', 'valueType', 'configGroup', 'state'],
     create: {
       fields: [
@@ -271,7 +275,7 @@ export const RESOURCES: ResourceDef[] = [
     update: { fields: [{ name: 'configValue' }, ...meta] },
   },
   {
-    name: 'log', idField: 'logUuid', scoped: true, nameField: 'eventType',
+    name: 'log', lookup: { field: 'requestId', use: 'outcome' }, idField: 'logUuid', scoped: true, nameField: 'eventType',
     columns: ['logType', 'eventType', 'aggregateId', 'traceId', 'occurredAt'],
     detailFields: ['content'],
     filters: [{ name: 'eventType' }],
@@ -283,3 +287,6 @@ export const resourceByName = (name: string): ResourceDef => {
   if (!r) throw new Error(`unknown resource ${name}`);
   return r;
 };
+
+export const enumLabelKey = (column: string, value: unknown): string | undefined =>
+  ENUMS[column]?.find((o) => String(o.value) === String(value))?.label;

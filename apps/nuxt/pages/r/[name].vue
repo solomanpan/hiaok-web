@@ -1,17 +1,17 @@
 <script setup lang="ts">
 import { ChevronLeft, ChevronRight, ListTree, Plus, RefreshCw, Search, Table2 } from 'lucide-vue-next';
 import {
-  changes, createRow, deleteRow, formatCell, initialValues, listRows, loadTree, resourceByName, runAction,
-  updateRow, type ActionDef, type Row, type RowPage, type TreeNode, type Values,
-} from '@hiaok/shared';
+  changes, formatCell, initialValues, resourceByName,
+  type ActionDef, type Page, type Row, type TreeNode, type Values,
+} from '@hiaok/core';
 
 const PAGE = 20;
 const route = useRoute();
-const { client, session, t, l } = useApp();
+const { app, session, access, t, l } = useApp();
 const name = computed(() => String(route.params.name));
 const res = computed(() => resourceByName(name.value));
 
-const page = ref<RowPage | null>(null);
+const page = ref<Page | null>(null);
 const tree = ref<TreeNode[] | null>(null);
 const offset = ref(0);
 const filters = reactive<Values>({});
@@ -25,14 +25,34 @@ type Dialog =
   | { kind: 'action'; row: Row; action: ActionDef } | { kind: 'result'; title: string; data: unknown };
 const dialog = ref<Dialog | null>(null);
 
+const lookupText = ref('');
+async function lookup() {
+  const lk = res.value.lookup;
+  if (!lk || !lookupText.value.trim()) return;
+  error.value = '';
+  try {
+    const key = lookupText.value.trim();
+    const data = lk.use === 'outcome' ? await app.resources.outcome.execute(key) : await app.resources.configByKey.execute(key);
+    dialog.value = { kind: 'result', title: `${l(lk.field)}: ${key}`, data };
+  } catch (e) { error.value = errorText(e); }
+}
+
+// the detail dialog shows the list row at once, then the server's current version (`<resource>/get`)
+const fresh = ref<Row | null>(null);
+watch(dialog, async (d) => {
+  fresh.value = null;
+  if (d?.kind !== 'detail') return;
+  try { const r = await app.resources.get.execute(res.value, d.row); if (dialog.value === d) fresh.value = r; } catch { /* keep the list row */ }
+});
+
 const needsOrg = computed(() => res.value.scoped && !session.value.orgUuid);
 
 async function load() {
   if (needsOrg.value) return;
   loading.value = true; error.value = '';
   try {
-    if (asTree.value && res.value.tree) tree.value = await loadTree(client, res.value, session.value);
-    else page.value = await listRows(client, res.value, session.value, offset.value, PAGE, applied.value);
+    if (asTree.value && res.value.tree) tree.value = await app.resources.tree.execute(res.value);
+    else page.value = await app.resources.list.execute(res.value, offset.value, PAGE, applied.value);
   } catch (e) { error.value = errorText(e); }
   finally { loading.value = false; }
 }
@@ -55,19 +75,19 @@ const editInitial = computed(() => {
   return d?.kind === 'edit' && res.value.update ? initialValues(res.value.update.fields, session.value, d.row) : {};
 });
 
-async function submitCreate(v: Values) { await createRow(client, res.value, session.value, v); await done(); }
+async function submitCreate(v: Values) { await app.resources.create.execute(res.value, v); await done(); }
 async function submitEdit(v: Values) {
   const d = dialog.value;
   if (d?.kind !== 'edit' || !res.value.update) return;
   const diff = changes(res.value.update.fields, editInitial.value, v);
   if (Object.keys(diff).length === 0) return;
-  await updateRow(client, res.value, session.value, d.row, diff);
+  await app.resources.update.execute(res.value, d.row, diff);
   await done();
 }
 async function submitAction(v: Values) {
   const d = dialog.value;
   if (d?.kind !== 'action') return;
-  const out = await runAction(client, res.value, d.action, session.value, d.row, v);
+  const out = await app.resources.runAction.execute(res.value, d.action, d.row, v);
   if (d.action.showResult) dialog.value = { kind: 'result', title: l(d.action.key), data: out };
   else await done();
 }
@@ -75,7 +95,7 @@ async function confirmDelete() {
   const d = dialog.value;
   if (d?.kind !== 'delete') return;
   dialog.value = null;
-  try { await deleteRow(client, res.value, session.value, d.row); await done(); } catch (e) { error.value = errorText(e); }
+  try { await app.resources.remove.execute(res.value, d.row); await done(); } catch (e) { error.value = errorText(e); }
 }
 // a result dialog opened by the action must survive the action form closing
 function closeAction() { if (dialog.value?.kind === 'action') dialog.value = null; }
@@ -86,12 +106,16 @@ const rowName = (row: Row) => String(row[res.value.nameField] ?? row[res.value.i
   <div class="space-y-4">
     <div class="flex flex-wrap items-center gap-2">
       <h2 class="mr-2 text-2xl font-semibold tracking-tight">{{ l(res.name) }}</h2>
-      <UiButton v-if="res.create" @click="dialog = { kind: 'create' }"><Plus />{{ t('add') }}</UiButton>
+      <UiButton v-if="res.create && access.can(res, 'add')" @click="dialog = { kind: 'create' }"><Plus />{{ t('add') }}</UiButton>
       <UiButton variant="outline" @click="load"><RefreshCw />{{ t('refresh') }}</UiButton>
-      <UiButton v-if="res.tree" variant="outline" @click="asTree = !asTree">
+      <UiButton v-if="res.tree && access.can(res, 'tree')" variant="outline" @click="asTree = !asTree">
         <Table2 v-if="asTree" /><ListTree v-else />{{ asTree ? t('listView') : t('treeView') }}
       </UiButton>
       <span class="flex-1" />
+      <template v-if="res.lookup">
+        <UiInput v-model="lookupText" class="w-48" :placeholder="l(res.lookup.field)" @keydown.enter="lookup" />
+        <UiButton variant="outline" @click="lookup"><Search />{{ t('search') }}</UiButton>
+      </template>
       <template v-if="!asTree && res.filters">
         <UiInput v-for="f in res.filters" :key="f.name" class="w-40" :placeholder="l(f.name)" :model-value="String(filters[f.name] ?? '')"
           @update:model-value="(v) => { filters[f.name] = v; }" @keydown.enter="search" />
@@ -133,9 +157,9 @@ const rowName = (row: Row) => String(row[res.value.nameField] ?? row[res.value.i
                 <td class="px-3 py-2.5">
                   <div class="flex gap-1.5">
                     <UiButton size="sm" variant="outline" @click="dialog = { kind: 'detail', row }">{{ t('details') }}</UiButton>
-                    <UiButton v-if="res.update" size="sm" variant="outline" @click="dialog = { kind: 'edit', row }">{{ t('edit') }}</UiButton>
-                    <UiButton v-for="a in res.actions" :key="a.key" size="sm" variant="secondary" @click="dialog = { kind: 'action', row, action: a }">{{ l(a.key) }}</UiButton>
-                    <UiButton v-if="res.remove" size="sm" variant="ghost" class="text-destructive hover:text-destructive" @click="dialog = { kind: 'delete', row }">{{ t('delete') }}</UiButton>
+                    <UiButton v-if="res.update && access.can(res, 'update')" size="sm" variant="outline" @click="dialog = { kind: 'edit', row }">{{ t('edit') }}</UiButton>
+                    <UiButton v-for="a in (res.actions ?? []).filter((x) => access.can(res, x.endpoint))" :key="a.key" size="sm" variant="secondary" @click="dialog = { kind: 'action', row, action: a }">{{ l(a.key) }}</UiButton>
+                    <UiButton v-if="res.remove && access.can(res, 'delete')" size="sm" variant="ghost" class="text-destructive hover:text-destructive" @click="dialog = { kind: 'delete', row }">{{ t('delete') }}</UiButton>
                   </div>
                 </td>
               </tr>
@@ -166,7 +190,7 @@ const rowName = (row: Row) => String(row[res.value.nameField] ?? row[res.value.i
       </div>
     </UiDialog>
     <UiDialog v-if="dialog?.kind === 'detail' || dialog?.kind === 'result'" :title="dialog.kind === 'detail' ? rowName(dialog.row) : dialog.title" @close="dialog = null">
-      <pre class="max-h-[50vh] overflow-auto rounded-md bg-muted p-3 text-xs">{{ JSON.stringify(dialog.kind === 'detail' ? dialog.row : dialog.data, null, 2) }}</pre>
+      <pre class="max-h-[50vh] overflow-auto rounded-md bg-muted p-3 text-xs">{{ JSON.stringify(dialog.kind === 'detail' ? (fresh ?? dialog.row) : dialog.data, null, 2) }}</pre>
       <div class="flex justify-end"><UiButton variant="outline" @click="dialog = null">{{ t('close') }}</UiButton></div>
     </UiDialog>
   </div>

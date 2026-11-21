@@ -1,5 +1,5 @@
 <script setup lang="ts">
-const { client, session, update, t } = useApp();
+const { app, session, t } = useApp();
 const org = ref(session.value.orgUuid);
 const tenant = ref(session.value.tenantUuid);
 const username = ref('');
@@ -13,11 +13,10 @@ watch(org, () => { tenant.value = ''; });
 async function submit() {
   busy.value = true; error.value = '';
   try {
-    const r = await client.auth.login({
+    await app.auth.signIn.execute({
       orgUuid: org.value, tenantUuid: tenant.value, username: username.value, password: password.value,
       ...(captcha.value?.required ? { captchaId: captcha.value.captchaId ?? undefined, captchaCode: code.value } : {}),
     });
-    update({ token: r.accessToken, orgUuid: org.value, tenantUuid: tenant.value, userUuid: r.userUuid });
     await navigateTo('/');
   } catch (e) {
     error.value = errorText(e); code.value = ''; void refreshCaptcha(); // a captcha is single-use, even after a wrong answer
@@ -28,8 +27,7 @@ async function submit() {
 async function enterWithoutAuth() {
   error.value = '';
   try {
-    const me = await client.auth.me();
-    update({ token: null, orgUuid: org.value || me.orgUuid, tenantUuid: tenant.value || me.tenantUuid, userUuid: me.userUuid });
+    await app.auth.enterWithoutAuth.execute({ orgUuid: org.value, tenantUuid: tenant.value });
     await navigateTo('/');
   } catch (e) { error.value = errorText(e); }
 }

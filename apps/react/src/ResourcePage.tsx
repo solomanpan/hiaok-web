@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  changes, createRow, deleteRow, formatCell, initialValues, listRows, loadTree, resourceByName, runAction, updateRequest,
-  updateRow, type ActionDef, type ResourceDef, type Row, type RowPage, type TreeNode, type Values,
-} from '@hiaok/shared';
+  changes, formatCell, initialValues, resourceByName, type ActionDef, type Page, type ResourceDef, type Row, type TreeNode, type Values,
+} from '@hiaok/core';
 import { ChevronLeft, ChevronRight, ListTree, Plus, RefreshCw, Search, Table2 } from 'lucide-react';
 import { Alert } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -38,10 +37,26 @@ function TreeView({ nodes, res, render }: { nodes: TreeNode[]; res: ResourceDef;
   );
 }
 
+/** Shows the row from the list at once, then replaces it with the server's current version (`<resource>/get`). */
+function DetailModal({ res, row, onClose }: { res: ResourceDef; row: Row; onClose: () => void }) {
+  const { app } = useApp();
+  const [fresh, setFresh] = useState<Row>(row);
+  useEffect(() => {
+    let live = true;
+    app.resources.get.execute(res, row).then((r) => live && setFresh(r)).catch(() => undefined);
+    return () => { live = false; };
+  }, [app, res, row]);
+  return (
+    <Modal title={String(fresh[res.nameField] ?? '')} onClose={onClose}>
+      <pre className="max-h-[50vh] overflow-auto rounded-md bg-muted p-3 text-xs">{JSON.stringify(fresh, null, 2)}</pre>
+    </Modal>
+  );
+}
+
 export function ResourcePage({ name }: { name: string }) {
-  const { client, session, t, l, locale } = useApp();
+  const { app, session, access, t, l, locale } = useApp();
   const res = useMemo(() => resourceByName(name), [name]);
-  const [page, setPage] = useState<RowPage | null>(null);
+  const [page, setPage] = useState<Page | null>(null);
   const [tree, setTree] = useState<TreeNode[] | null>(null);
   const [offset, setOffset] = useState(0);
   const [filters, setFilters] = useState<Values>({});
@@ -55,17 +70,27 @@ export function ResourcePage({ name }: { name: string }) {
     | { kind: 'action'; row: Row; action: ActionDef } | { kind: 'result'; title: string; data: unknown } | null
   >(null);
 
+  const [lookupText, setLookupText] = useState('');
   const needsOrg = res.scoped && !session.orgUuid;
+
+  const lookup = async () => {
+    if (!res.lookup || !lookupText.trim()) return;
+    setError('');
+    try {
+      const data = res.lookup.use === 'outcome' ? await app.resources.outcome.execute(lookupText.trim()) : await app.resources.configByKey.execute(lookupText.trim());
+      setDialog({ kind: 'result', title: `${l(res.lookup.field)}: ${lookupText.trim()}`, data });
+    } catch (e) { setError(errorText(e)); }
+  };
 
   const load = useCallback(async () => {
     if (needsOrg) return;
     setLoading(true); setError('');
     try {
-      if (asTree && res.tree) setTree(await loadTree(client, res, session));
-      else setPage(await listRows(client, res, session, offset, PAGE, applied));
+      if (asTree && res.tree) setTree(await app.resources.tree.execute(res));
+      else setPage(await app.resources.list.execute(res, offset, PAGE, applied));
     } catch (e) { setError(errorText(e)); }
     finally { setLoading(false); }
-  }, [client, res, session, offset, applied, asTree, needsOrg]);
+  }, [app, res, session.orgUuid, session.baseUrl, offset, applied, asTree, needsOrg]);
 
   useEffect(() => { setOffset(0); setApplied({}); setFilters({}); setPage(null); setTree(null); setAsTree(false); setNotice(''); }, [name]);
   useEffect(() => { void load(); }, [load]);
@@ -80,9 +105,9 @@ export function ResourcePage({ name }: { name: string }) {
   const rowButtons = (row: Row) => (
     <>
       <Button size="sm" variant="outline" onClick={() => setDialog({ kind: 'detail', row })}>{t('details')}</Button>
-      {res.update && <Button size="sm" variant="outline" onClick={() => setDialog({ kind: 'edit', row })}>{t('edit')}</Button>}
-      {res.actions?.map((a) => <Button size="sm" variant="secondary" key={a.key} onClick={() => setDialog({ kind: 'action', row, action: a })}>{l(a.key)}</Button>)}
-      {res.remove && <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => setDialog({ kind: 'delete', row })}>{t('delete')}</Button>}
+      {res.update && access.can(res, 'update') && <Button size="sm" variant="outline" onClick={() => setDialog({ kind: 'edit', row })}>{t('edit')}</Button>}
+      {res.actions?.filter((a) => access.can(res, a.endpoint)).map((a) => <Button size="sm" variant="secondary" key={a.key} onClick={() => setDialog({ kind: 'action', row, action: a })}>{l(a.key)}</Button>)}
+      {res.remove && access.can(res, 'delete') && <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => setDialog({ kind: 'delete', row })}>{t('delete')}</Button>}
     </>
   );
 
@@ -90,10 +115,17 @@ export function ResourcePage({ name }: { name: string }) {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
         <h2 className="mr-2 text-2xl font-semibold tracking-tight">{l(res.name)}</h2>
-        {res.create && <Button onClick={() => setDialog({ kind: 'create' })}><Plus />{t('add')}</Button>}
+        {res.create && access.can(res, 'add') && <Button onClick={() => setDialog({ kind: 'create' })}><Plus />{t('add')}</Button>}
         <Button variant="outline" onClick={() => void load()}><RefreshCw />{t('refresh')}</Button>
-        {res.tree && <Button variant="outline" onClick={() => setAsTree(!asTree)}>{asTree ? <Table2 /> : <ListTree />}{asTree ? t('listView') : t('treeView')}</Button>}
+        {res.tree && access.can(res, 'tree') && <Button variant="outline" onClick={() => setAsTree(!asTree)}>{asTree ? <Table2 /> : <ListTree />}{asTree ? t('listView') : t('treeView')}</Button>}
         <span className="flex-1" />
+        {res.lookup && (
+          <>
+            <Input className="w-48" placeholder={l(res.lookup.field)} value={lookupText} onChange={(e) => setLookupText(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') void lookup(); }} />
+            <Button variant="outline" onClick={() => void lookup()}><Search />{t('search')}</Button>
+          </>
+        )}
         {!asTree && res.filters?.map((f) => (
           <Input key={f.name} className="w-40" placeholder={l(f.name)} value={String(filters[f.name] ?? '')}
             onChange={(e) => setFilters({ ...filters, [f.name]: e.target.value })}
@@ -142,7 +174,7 @@ export function ResourcePage({ name }: { name: string }) {
 
       {dialog?.kind === 'create' && res.create && (
         <FormDialog title={`${t('add')} · ${l(res.name)}`} fields={res.create.fields} initial={initialValues(res.create.fields, session)}
-          onSubmit={async (v) => { await createRow(client, res, session, v); await done(true); }} onClose={() => setDialog(null)} />
+          onSubmit={async (v) => { await app.resources.create.execute(res, v); await done(true); }} onClose={() => setDialog(null)} />
       )}
       {dialog?.kind === 'edit' && res.update && (() => {
         const row = dialog.row;
@@ -152,8 +184,7 @@ export function ResourcePage({ name }: { name: string }) {
             onSubmit={async (v) => {
               const diff = changes(res.update!.fields, initial, v);
               if (Object.keys(diff).length === 0) return;
-              updateRequest(res, session, row, diff); // validates the shape before sending
-              await updateRow(client, res, session, row, diff); await done(true);
+                            await app.resources.update.execute(res, row, diff); await done(true);
             }} onClose={() => setDialog(null)} />
         );
       })()}
@@ -163,7 +194,7 @@ export function ResourcePage({ name }: { name: string }) {
           <FormDialog title={`${l(action.key)} · ${String(row[res.nameField] ?? '')}`} fields={action.fields}
             initial={initialValues(action.fields, session, row, action.prefill)} submitLabel={t('confirm')}
             onSubmit={async (v) => {
-              const out = await runAction(client, res, action, session, row, v);
+              const out = await app.resources.runAction.execute(res, action, row, v);
               if (action.showResult) setDialog({ kind: 'result', title: l(action.key), data: out });
               else await done(true);
               if (action.showResult) throw new Error('');
@@ -174,13 +205,13 @@ export function ResourcePage({ name }: { name: string }) {
         <Modal title={t('confirmDelete')} onClose={() => setDialog(null)} footer={
           <Button variant="destructive" onClick={async () => {
             const row = dialog.row; setDialog(null);
-            try { await deleteRow(client, res, session, row); await done(true); } catch (e) { setError(errorText(e)); }
+            try { await app.resources.remove.execute(res, row); await done(true); } catch (e) { setError(errorText(e)); }
           }}>{t('delete')}</Button>
         }>
           <p className="break-all text-sm">{String(dialog.row[res.nameField] ?? dialog.row[res.idField])}</p>
         </Modal>
       )}
-      {dialog?.kind === 'detail' && <Modal title={String(dialog.row[res.nameField] ?? '')} onClose={() => setDialog(null)}><pre className="max-h-[50vh] overflow-auto rounded-md bg-muted p-3 text-xs">{JSON.stringify(dialog.row, null, 2)}</pre></Modal>}
+      {dialog?.kind === 'detail' && <DetailModal res={res} row={dialog.row} onClose={() => setDialog(null)} />}
       {dialog?.kind === 'result' && <Modal title={dialog.title} onClose={() => setDialog(null)}><pre className="max-h-[50vh] overflow-auto rounded-md bg-muted p-3 text-xs">{JSON.stringify(dialog.data, null, 2)}</pre></Modal>}
     </div>
   );

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-const { client, session, t } = useApp();
+const { app, session, t } = useApp();
 const org = ref(session.value.orgUuid);
 const f = reactive({ tenant: session.value.tenantUuid, username: '', password: '', email: '', phone: '', nickname: '' });
 const code = ref('');
@@ -12,7 +12,7 @@ watch(org, () => { f.tenant = ''; });
 async function submit() {
   busy.value = true; error.value = ''; done.value = false;
   try {
-    await client.users.register({
+    await app.auth.register.execute({
       orgUuid: org.value, tenantUuid: f.tenant, username: f.username, password: f.password,
       ...(f.email ? { email: f.email } : {}), ...(f.phone ? { phone: f.phone } : {}), ...(f.nickname ? { nickname: f.nickname } : {}),
       ...(captcha.value?.required ? { captchaId: captcha.value.captchaId ?? undefined, captchaCode: code.value } : {}),

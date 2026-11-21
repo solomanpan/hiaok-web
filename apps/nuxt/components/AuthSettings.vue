@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { BACKENDS, LOCALES, type Backend, type Locale } from '@hiaok/shared';
+import { BACKENDS, LOCALES, type Backend, type Locale } from '@hiaok/core';
 const { session, update, t } = useApp();
 </script>
 

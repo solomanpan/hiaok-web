@@ -39,8 +39,9 @@ const sleep = (ms: number, signal?: AbortSignal) =>
   });
 
 export function createClient(opts: ClientOptions = {}) {
-  const prefix = (opts.prefix ?? '/v1/api/hiaok').replace(/\/$/, '');
-  const base = (opts.baseUrl ?? '').replace(/\/$/, '');
+  // read on every call: the server URL and backend can change while the client lives (settings on the sign-in page)
+  const prefix = () => (opts.prefix ?? '/v1/api/hiaok').replace(/\/$/, '');
+  const base = () => (opts.baseUrl ?? '').replace(/\/$/, '');
   const doFetch = opts.fetch ?? ((...a: Parameters<typeof fetch>) => globalThis.fetch(...a));
 
   /** One API call. Resolves with `resultInfo`; rejects with [`ApiError`] on `code != 0`. */
@@ -53,7 +54,7 @@ export function createClient(opts: ClientOptions = {}) {
 
     let res: Response;
     try {
-      res = await doFetch(`${base}${prefix}/${resource}/${action}`, {
+      res = await doFetch(`${base()}${prefix()}/${resource}/${action}`, {
         method: 'POST',
         headers,
         body: JSON.stringify({ requestId, reqInfo }),

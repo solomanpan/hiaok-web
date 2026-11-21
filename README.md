@@ -10,13 +10,26 @@ It talks to the hiaok back end (`POST /v1/api/hiaok/<resource>/<action>` with `{
 
 ```
 packages/api-client   typed client: envelope, ApiError, submit + poll for the asynchronous writes
-packages/shared       resource registry (RESOURCES), request builders, labels (en / zh / ja), session storage
+packages/core         the application, layered like the back ends (see below)
 apps/react            Vite + React 19 + Tailwind + shadcn/ui
 apps/nuxt             Nuxt 3, SPA (`ssr: false`) + Tailwind + shadcn-vue — same pages, same registry
 src-tauri             Tauri 2 shell (desktop + mobile) around the React build
 ```
 
 **UI**: Tailwind CSS v4 with shadcn/ui — `apps/react/src/components/ui` (Radix primitives) and, for Nuxt, the shadcn-vue counterpart `apps/nuxt/components/ui` (Reka UI). Both use the same theme tokens (`styles.css`: light/dark follows the OS, `--primary` etc.), so restyling is one file. The components are source files in the repo, as in shadcn: edit them freely. Selects are the styled native `<select>` (shadcn "native select"), which behaves best inside iOS / Android web views.
+
+### Layers (`packages/core/src`)
+
+```
+domain/           Session, Access (what the user may do), the resource catalog (RESOURCES), ports (ResourceGateway, AuthGateway, SessionStore)
+application/      use cases (SignIn, SignOut, RegisterUser, ListResource, CreateResource, RunAction, LoadAccess ...),
+                  form + request logic, SessionManager
+infrastructure/   adapters: HTTP gateways over api-client, localStorage session store
+app.ts            composition root: createHiaokApp() wires use cases to adapters
+i18n/             messages and labels (en / zh / ja)
+```
+
+Dependencies point inward and a test enforces it (`architecture.test.ts`): `domain` imports nothing outside itself, `application` never touches `infrastructure` or the HTTP client. The React and Nuxt apps depend only on `@hiaok/core` and call use cases — they never see HTTP. Tests swap the gateways for fakes.
 
 Both apps render every list, form and action **from `RESOURCES`** — a new endpoint is a few lines in `packages/shared/src/resources.ts`, not a new page.
 
@@ -44,6 +57,9 @@ The **Backend** selector switches the URL prefix (`hiaok`, `kimoj`, `ladepa`) �
 - **Register** — `user/register`, with the same captcha handling. Passwords need 8+ characters.
 - **Writes** are asynchronous on the server (`accepted` first); the UI waits for the outcome through `log/get-by-request` and shows success or the failure reason.
 - `state` is `0 = enabled`, `1 = disabled`; `permType` / `menuType` are menu / api / button.
+- **Sign out** ends the session on the server too (`auth/logout`), then clears it locally even if the server is unreachable.
+- **Permissions**: for guarded resources (role, menu) the navigation and the buttons follow the user's permission codes (`role:list`, `role:*`, `*`); with auth off nothing is hidden.
+- Detail dialogs fetch the current row (`<resource>/get`); the log page looks up a command by request id, the config page a value by key.
 - Language (English / 中文 / 日本語) is switchable on every screen; the session is kept in local storage.
 
 ## Desktop and mobile (Tauri 2)
